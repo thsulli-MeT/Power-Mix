@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>sMV Power Mix</title>
+  <link rel="stylesheet" href="styles.css?v=25"/>
+</head>
+<body>
+  <!-- TOP SPONSOR BAR -->
+  <header class="sponsorbar">
+    <div class="sponsor-box" id="sponsorLeft">
+      <div class="sponsor-inner">Sponsor 1</div>
+    </div>
+
+    <div class="logo-wrap" title="sMV Power Mix">
+      <img src="assets/power-mix-logo.png" alt="sMV Power Mix" class="logo-img" />
+    </div>
+
+    <div class="sponsor-box" id="sponsorRight">
+      <div class="sponsor-inner">Sponsor 2</div>
+    </div>
+  </header>
+
+  <!-- CONTROL STRIP (start + shortcuts) -->
+  <div class="controlstrip">
+    <div class="version-badge">v0.25 (v0.22 baseline + samples)</div>
+    <div class="startcluster">
+      <button id="enableAudio" class="btn primary flash-until-enabled">Enable WebAudio</button>
+      <div class="start-hint">⬅︎ click to start audio</div>
+    </div>
+    <button id="shortcutsBtn" class="btn ghost">Shortcuts</button>
+  </div>
+
+  <!-- DUAL WAVEFORMS -->
+  <section class="wavepanel card">
+    <div class="wave-row">
+      <div class="wave-label">A</div>
+      <canvas id="waveA" class="wave-canvas" width="1200" height="80"></canvas>
+    </div>
+    <div class="wave-row">
+      <div class="wave-label">B</div>
+      <canvas id="waveB" class="wave-canvas" width="1200" height="80"></canvas>
+    </div>
+    <div class="wave-tip">Tip: click the top waveform to seek. Hot Spots (1–8) set/jump. Shift+Click a Hot Spot clears it.</div>
+  </section>
+
+  <!-- MAIN GRID -->
+  <main class="main-grid">
+    <!-- LEFT COLUMN -->
+    <div class="col">
+      <section class="side card">
+        <div class="side-title">Effects</div>
+        <div id="fxBtnsA" class="fx-grid" aria-label="Deck A effects"></div>
+
+        <div class="hs-title">Hot Spots</div>
+        <div id="hotBtnsA" class="hot-grid hotspots" aria-label="Deck A hot spots"></div>
+      </section>
+
+      <section class="deck card">
+        <div class="deck-head">
+          <div class="deck-title">DECK A</div>
+          <div class="deck-meta"><span id="trackAName">—</span> • <span id="timeA">0:00 / 0:00</span></div>
+        </div>
+
+        <div class="deck-controls">
+          <button id="loadLocalA" class="btn ghost">Load (Local)</button>
+          <button id="playA" class="btn primary">Play/Pause</button>
+          <button id="cueA" class="btn ghost">Cue</button>
+        </div>
+
+        <div class="platter">
+          <div class="platter-disc" id="platterA" aria-label="Deck A platter">
+            <div class="platter-core"></div>
+          </div>
+          <div class="platter-label">Drag to scratch (coming next)</div>
+        </div>
+      </section>
+    </div>
+
+    <!-- CENTER COLUMN -->
+    <div class="col">
+      <section class="center card">
+        <div class="center-title">Crossfader</div>
+
+        <div class="xfader-wrap">
+          <div class="xfader-head">
+            <span class="a">A</span>
+            <span class="mid">CROSS</span>
+            <span class="b">B</span>
+          </div>
+          <input id="cross" type="range" min="0" max="1" step="0.001" value="0.5"/>
+          <div class="mixview"><div id="mixfill" class="mixfill"></div></div>
+          <label class="chk"><input id="quickCross" type="checkbox"/> Quick Cross</label>
+        </div>
+
+        <div class="transitions">
+          <div class="block-title">Power Mix Transitions</div>
+          <div class="row">
+            <select id="transitionStyle" class="select">
+              <option value="halo">Halo Fade</option>
+              <option value="echo">Echo Drift</option>
+              <option value="coin">Coin Flip</option>
+              <option value="pulse">Pulse Roll</option>
+              <option value="lift">Voltage Lift</option>
+            </select>
+            <button id="runTransition" class="btn ghost">Run</button>
+          </div>
+          <div class="note" id="transitionNote">Runs A→B, then next time B→A.</div>
+        </div>
+
+        
+        <div class="samples">
+          <div class="block-title">Samples (8)</div>
+          <div class="note">Click a pad to play a sample. Shift+Click to assign from local file. (Prototype)</div>
+          <div id="samplePads" class="sample-grid" aria-label="Sample pads"></div>
+        </div>
+
+        <div class="syncassist">
+          <div class="block-title">Sync Assist</div>
+          <div class="bpm-row">
+            <div class="bpm">
+              <div class="bpm-label">Deck A BPM</div>
+              <div id="bpmA" class="bpm-val">—</div>
+            </div>
+            <div class="bpm">
+              <div class="bpm-label">Deck B BPM</div>
+              <div id="bpmB" class="bpm-val">—</div>
+            </div>
+          </div>
+          <div class="row">
+            <button id="tapBpmB" class="btn ghost">Tap BPM (B)</button>
+            <button id="matchBpm" class="btn primary">Match BPM</button>
+            <button id="resetRates" class="btn ghost">Reset Rates</button>
+          </div>
+          <div class="note">Tap BPM is manual for now. Match BPM adjusts Deck B playback rate to Deck A.</div>
+        </div>
+
+        <div class="library">
+          <div class="block-title">Library</div>
+          <div class="row">
+            <button id="scanAudio" class="btn ghost">Scan /audio folder</button>
+            <button id="clearQueue" class="btn ghost">Clear</button>
+          </div>
+          <div class="note">Drop .wav/.mp3 files into <b>audio/</b>, then click Scan.</div>
+          <div id="libList" class="liblist"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="col">
+      <section class="side card">
+        <div class="side-title">Effects</div>
+        <div id="fxBtnsB" class="fx-grid" aria-label="Deck B effects"></div>
+
+        <div class="hs-title">Hot Spots</div>
+        <div id="hotBtnsB" class="hot-grid hotspots" aria-label="Deck B hot spots"></div>
+      </section>
+
+      <section class="deck card">
+        <div class="deck-head">
+          <div class="deck-title">DECK B</div>
+          <div class="deck-meta"><span id="trackBName">—</span> • <span id="timeB">0:00 / 0:00</span></div>
+        </div>
+
+        <div class="deck-controls">
+          <button id="loadLocalB" class="btn ghost">Load (Local)</button>
+          <button id="playB" class="btn primary">Play/Pause</button>
+          <button id="cueB" class="btn ghost">Cue</button>
+        </div>
+
+        <div class="platter">
+          <div class="platter-disc" id="platterB" aria-label="Deck B platter">
+            <div class="platter-core"></div>
+          </div>
+          <div class="platter-label">Drag to scratch (coming next)</div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div id="shortcutsModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-title">Shortcuts</div>
+      <div class="modal-body">
+        <div class="krow"><span class="k">1–8</span> set/jump Hot Spots (Deck A)</div>
+        <div class="krow"><span class="k">Shift+Click</span> clear a Hot Spot</div>
+        <div class="krow"><span class="k">Click waveform</span> seek</div>
+      </div>
+      <button id="closeShortcuts" class="btn ghost">Close</button>
+    </div>
+  </div>
+
+  <script src="app.js?v=25"></script>
+</body>
+</html>
