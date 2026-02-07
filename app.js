@@ -272,10 +272,11 @@ function playSample(slot){
   const s = sampleBank[slot];
   if(!s || !s.buffer) return;
 
+  // toggle off if already playing
   if(sampleVoices[slot]){
     try{ sampleVoices[slot].src.stop(); }catch(_){}
     sampleVoices[slot] = null;
-    const pad=document.querySelector(`[data-sample="${slot}"]`);
+    const pad = document.querySelector(`[data-sample="${slot}"]`);
     if(pad) pad.classList.remove("latched");
     return;
   }
@@ -287,17 +288,19 @@ function playSample(slot){
   const g = audioCtx.createGain();
   g.gain.value = 0.9;
 
-  src.connect(g); g.connect(audioCtx.destination);
+  src.connect(g);
+  g.connect(audioCtx.destination);
   src.start();
 
   sampleVoices[slot] = {src, gain:g};
-  const pad=document.querySelector(`[data-sample="${slot}"]`);
+
+  const pad = document.querySelector(`[data-sample="${slot}"]`);
   if(pad) pad.classList.add("latched");
 
-  src.onended=()=>{
-    if(sampleVoices[slot]?.src===src){
-      sampleVoices[slot]=null;
-      const p=document.querySelector(`[data-sample="${slot}"]`);
+  src.onended = ()=>{
+    if(sampleVoices[slot]?.src === src){
+      sampleVoices[slot] = null;
+      const p = document.querySelector(`[data-sample="${slot}"]`);
       if(p) p.classList.remove("latched");
     }
   };
@@ -483,6 +486,52 @@ function playScratchGrain(deck, tSec, direction){
     src.start(0, revOffset, grainDur);
   }
 }
+
+async function fetchArrayBuffer(url){
+  const res = await fetch(url, {cache:"no-store"});
+  if(!res.ok) throw new Error("fetch failed");
+  return await res.arrayBuffer();
+}
+async function decodeFromUrl(url){
+  const ab = await fetchArrayBuffer(url);
+  return await audioCtx.decodeAudioData(ab);
+}
+async function tryPreloadFromAudioFolder(){
+  try{
+    const res = await fetch("audio/preload.json", {cache:"no-store"});
+    if(!res.ok) return;
+    const cfg = await res.json();
+
+    // decks
+    if(cfg.deckA){
+      try{
+        const buf = await decodeFromUrl("audio/"+encodeURIComponent(cfg.deckA));
+        if(window.decks?.A){ window.decks.A.setBuffer(buf, cfg.deckA); }
+      }catch(e){}
+    }
+    if(cfg.deckB){
+      try{
+        const buf = await decodeFromUrl("audio/"+encodeURIComponent(cfg.deckB));
+        if(window.decks?.B){ window.decks.B.setBuffer(buf, cfg.deckB); }
+      }catch(e){}
+    }
+
+    // samples
+    if(Array.isArray(cfg.samples)){
+      for(let i=0;i<8;i++){
+        const name = cfg.samples[i];
+        if(!name) continue;
+        try{
+          const buf = await decodeFromUrl("audio/"+encodeURIComponent(name));
+          sampleBank[i] = {name, buffer: buf};
+          const el = document.querySelector(`[data-sample="${i}"]`);
+          if(el) el.title = name;
+        }catch(e){}
+      }
+    }
+  }catch(e){}
+}
+
 function wireScratch(platterId, deck){
   const el = $(platterId);
   if(!el) return;
@@ -629,17 +678,6 @@ async function scanAudio(){
   const clean = Array.from(new Set(matches.map(m=>m.replace(/^\.?\//,""))));
   return clean.map(fn=>({name:fn, url:"audio/"+fn}));
 }
-
-async function loadLibraryJson(){
-  try{
-    const res = await fetch("audio/library.json", {cache:"no-store"});
-    if(!res.ok) return null;
-    const data = await res.json();
-    const list = Array.isArray(data.library) ? data.library : [];
-    return list.filter(f=>/\.(mp3|wav)$/i.test(f))
-               .map(f=>({name:f,url:"audio/"+f}));
-  }catch(e){ return null; }
-}
 function renderLib(items){
   const wrap=$("libList"); if(!wrap) return;
   wrap.innerHTML="";
@@ -716,6 +754,5 @@ function loop(now){
 
 window.addEventListener("resize", redraw);
 wire();
-loadLibraryJson().then(items=>{ if(items&&items.length){ renderLib(items); } });
 redraw();
 requestAnimationFrame(loop);

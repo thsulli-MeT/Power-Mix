@@ -4,9 +4,24 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>sMV Power Mix</title>
-  <link rel="stylesheet" href="styles.css?v=25"/>
+  <link rel="stylesheet" href="styles.css?v=26"/>
 </head>
 <body>
+
+    <div class="top-sponsors">
+      <a class="sponsor-link left" href="https://thsulli-met.github.io/powerviz/" target="_blank" rel="noopener">
+        <img src="assets/sponsors.png" alt="sMV Power Viz" />
+      </a>
+
+      <div class="top-logo">
+        <img class="pm-logo pulse" src="assets/power-mix-logo.png" alt="sMV Power Mix" />
+      </div>
+
+      <a class="sponsor-link right" href="https://smv-short-music-videos.printify.me/" target="_blank" rel="noopener">
+        <img src="assets/sponsors.png" alt="sMV Merch" />
+      </a>
+    </div>
+    
   <!-- TOP SPONSOR BAR -->
   <header class="sponsorbar">
     <div class="sponsor-box" id="sponsorLeft">
@@ -24,7 +39,7 @@
 
   <!-- CONTROL STRIP (start + shortcuts) -->
   <div class="controlstrip">
-    <div class="version-badge">v0.25 (v0.22 baseline + samples)</div>
+    <div class="version-badge">v0.22 scratch-audio+label</div>
     <div class="startcluster">
       <button id="enableAudio" class="btn primary flash-until-enabled">Enable WebAudio</button>
       <div class="start-hint">⬅︎ click to start audio</div>
@@ -86,7 +101,7 @@
         <div class="xfader-wrap">
           <div class="xfader-head">
             <span class="a">A</span>
-            <span class="mid">CROSS</span>
+            <span class="mid">Crossfader</span>
             <span class="b">B</span>
           </div>
           <input id="cross" type="range" min="0" max="1" step="0.001" value="0.5"/>
@@ -192,6 +207,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=25"></script>
+  <script src="app.js?v=26"></script>
 </body>
 </html>
