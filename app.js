@@ -320,6 +320,13 @@ function renderSamplePads(){
     pad.title = "Click: toggle play/stop. Shift+Click: assign a local sample";
 
     pad.addEventListener("click", async (e)=>{
+      if(e.altKey){
+        if(!manifest) await loadManifest();
+        const items=(manifest && Array.isArray(manifest.samples)) ? manifest.samples : [];
+        showLibraryPopup(items.map(x=>({name:x.name||x.file,file:x.file})));
+        return;
+      }
+
       if(e.shiftKey){
         const input=document.createElement("input");
         input.type="file"; input.accept=".wav,.mp3,audio/*";
@@ -435,6 +442,7 @@ async function enableAudio(){
   }
   const hint = document.querySelector(".start-hint");
   if(hint) hint.textContent = "Audio ready";
+  loadManifest().then(()=>preloadFromManifest());
   renderSamplePads();
 }
 
@@ -487,49 +495,104 @@ function playScratchGrain(deck, tSec, direction){
   }
 }
 
-async function fetchArrayBuffer(url){
-  const res = await fetch(url, {cache:"no-store"});
-  if(!res.ok) throw new Error("fetch failed");
-  return await res.arrayBuffer();
-}
-async function decodeFromUrl(url){
-  const ab = await fetchArrayBuffer(url);
-  return await audioCtx.decodeAudioData(ab);
-}
-async function tryPreloadFromAudioFolder(){
+let manifest = null;
+
+async function loadManifest(){
   try{
-    const res = await fetch("audio/preload.json", {cache:"no-store"});
-    if(!res.ok) return;
-    const cfg = await res.json();
+    const res = await fetch("audio/library.json", {cache:"no-store"});
+    if(!res.ok) throw new Error("manifest missing");
+    manifest = await res.json();
+    return manifest;
+  }catch(e){
+    manifest = null;
+    return null;
+  }
+}
 
-    // decks
-    if(cfg.deckA){
-      try{
-        const buf = await decodeFromUrl("audio/"+encodeURIComponent(cfg.deckA));
-        if(window.decks?.A){ window.decks.A.setBuffer(buf, cfg.deckA); }
-      }catch(e){}
-    }
-    if(cfg.deckB){
-      try{
-        const buf = await decodeFromUrl("audio/"+encodeURIComponent(cfg.deckB));
-        if(window.decks?.B){ window.decks.B.setBuffer(buf, cfg.deckB); }
-      }catch(e){}
-    }
+function ensureLibraryPopup(){
+  if(document.getElementById("libPop")) return;
+  const wrap=document.createElement("div");
+  wrap.id="libPop";
+  wrap.className="lib-pop";
+  wrap.innerHTML = `
+    <div class="backdrop" id="libBack"></div>
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;">
+        <div style="font-weight:1000;letter-spacing:.04em;">Library</div>
+        <button class="btn" id="libClose">Close</button>
+      </div>
+      <div class="hint" style="margin-bottom:12px;">Click = load to Deck A • Option/Alt+Click = load to Deck B</div>
+      <div id="libList"></div>
+    </div>`;
+  document.body.appendChild(wrap);
+  document.getElementById("libClose").onclick = ()=> wrap.classList.remove("show");
+  document.getElementById("libBack").onclick = ()=> wrap.classList.remove("show");
+}
 
-    // samples
-    if(Array.isArray(cfg.samples)){
-      for(let i=0;i<8;i++){
-        const name = cfg.samples[i];
-        if(!name) continue;
-        try{
-          const buf = await decodeFromUrl("audio/"+encodeURIComponent(name));
-          sampleBank[i] = {name, buffer: buf};
-          const el = document.querySelector(`[data-sample="${i}"]`);
-          if(el) el.title = name;
-        }catch(e){}
-      }
-    }
-  }catch(e){}
+function showLibraryPopup(items){
+  ensureLibraryPopup();
+  const pop=document.getElementById("libPop");
+  const list=document.getElementById("libList");
+  list.innerHTML="";
+  items.forEach(it=>{
+    const row=document.createElement("div");
+    row.className="row";
+    row.innerHTML = `<div>
+        <div class="name">${it.name||it.file}</div>
+        <div class="hint">${it.file}</div>
+      </div>
+      <div class="hint">A / B</div>`;
+    row.addEventListener("click",(e)=>{
+      const toB = e.altKey; // option on mac
+      loadTrackToDeck(it.file, toB ? "B" : "A");
+      pop.classList.remove("show");
+    });
+    list.appendChild(row);
+  });
+  pop.classList.add("show");
+}
+
+async function preloadFromManifest(){
+  if(!manifest || !audioCtx) return;
+  const t = Array.isArray(manifest.tracks) ? manifest.tracks : [];
+  if(t[0]?.file) await loadTrackToDeck(t[0].file, "A");
+  if(t[1]?.file) await loadTrackToDeck(t[1].file, "B");
+
+  const s = Array.isArray(manifest.samples) ? manifest.samples : [];
+  for(let i=0;i<8;i++){
+    const item = s[i];
+    if(!item?.file) continue;
+    try{
+      const res = await fetch(item.file, {cache:"no-store"});
+      if(!res.ok) continue;
+      const ab = await res.arrayBuffer();
+      const decoded = await audioCtx.decodeAudioData(ab);
+      sampleBank[i] = {name: item.name || item.file.split("/").pop(), buffer: decoded};
+    }catch(_){}
+  }
+  if(typeof renderSamplePads === "function") renderSamplePads();
+}
+
+// This needs to hook into YOUR deck loading functions.
+// We'll try multiple known patterns so it works across builds.
+async function loadTrackToDeck(file, deckLetter){
+  // 1) If deck objects exist with loadFromURL
+  const deck = (deckLetter==="B") ? (window.decks && window.decks.B) : (window.decks && window.decks.A);
+  if(deck && typeof deck.loadFromURL === "function"){
+    await deck.loadFromURL(file);
+    return;
+  }
+  // 2) If there are hidden file loaders, try global helpers
+  if(typeof window.loadDeckFromURL === "function"){
+    await window.loadDeckFromURL(deckLetter, file);
+    return;
+  }
+  // 3) Fallback: simulate clicking library load if function exists
+  if(typeof window.__loadUrlToDeck === "function"){
+    await window.__loadUrlToDeck(deckLetter, file);
+    return;
+  }
+  console.warn("No deck URL loader found; use library click to load manually.", file);
 }
 
 function wireScratch(platterId, deck){
@@ -756,3 +819,12 @@ window.addEventListener("resize", redraw);
 wire();
 redraw();
 requestAnimationFrame(loop);
+
+document.addEventListener("keydown",(e)=>{
+  if((e.key||"").toLowerCase()==="l"){
+    loadManifest().then(m=>{
+      const items=(m && Array.isArray(m.tracks)) ? m.tracks : [];
+      showLibraryPopup(items.map(x=>({name:x.name||x.file,file:x.file})));
+    });
+  }
+});
