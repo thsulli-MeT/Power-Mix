@@ -11,11 +11,11 @@
   ],
   "samples": [
     {
-      "name": "whistle 1",
+      "name": "Whistle 1",
       "file": "audio/whistle_1.mp3"
     },
     {
-      "name": "chirp",
+      "name": "Chirp",
       "file": "audio/chirp.mp3"
     },
     {
@@ -23,24 +23,130 @@
       "file": "audio/Scratch_3.mp3"
     },
     {
-      "name": "phaser",
+      "name": "Phaser",
       "file": "audio/phaser.mp3"
     },
     {
-      "name": "scratch fast",
+      "name": "Scratch Fast",
       "file": "audio/scratch_fast.mp3"
     },
     {
-      "name": "itchy",
+      "name": "Itchy",
       "file": "audio/itchy.mp3"
+    },
+    {
+      "name": "Drama",
+      "file": "audio/drama.mp3"
+    },
+    {
+      "name": "Pullover",
+      "file": "audio/pullover.mp3"
+    }
+  ],
+  "library": [
+    {
+      "name": "0 Lead Vocals 01",
+      "file": "audio/0 Lead Vocals_01.mp3"
+    },
+    {
+      "name": "1 Instrumental 01",
+      "file": "audio/1 Instrumental_01.mp3"
+    },
+    {
+      "name": "123yeah",
+      "file": "audio/123yeah.mp3"
+    },
+    {
+      "name": "42woo",
+      "file": "audio/42woo.mp3"
+    },
+    {
+      "name": "Demo Track 1",
+      "file": "audio/Demo Track 1.mp3"
+    },
+    {
+      "name": "Demo Track 2",
+      "file": "audio/Demo Track 2.mp3"
+    },
+    {
+      "name": "Im not a DJ",
+      "file": "audio/Im_not_a_DJ.mp3"
+    },
+    {
+      "name": "Scratch 3",
+      "file": "audio/Scratch_3.mp3"
+    },
+    {
+      "name": "Slop this",
+      "file": "audio/Slop_this.mp3"
+    },
+    {
+      "name": "bam",
+      "file": "audio/bam.mp3"
+    },
+    {
+      "name": "big talker",
+      "file": "audio/big_talker.mp3"
+    },
+    {
+      "name": "chichibam",
+      "file": "audio/chichibam.mp3"
+    },
+    {
+      "name": "chirp",
+      "file": "audio/chirp.mp3"
+    },
+    {
+      "name": "chopper",
+      "file": "audio/chopper.mp3"
+    },
+    {
+      "name": "DJ Samples  1",
+      "file": "audio/dj_Samples_1.mp3"
+    },
+    {
+      "name": "DJ Samples  2",
+      "file": "audio/dj_Samples_2.mp3"
+    },
+    {
+      "name": "DJ Samples  3",
+      "file": "audio/dj_Samples_3.mp3"
+    },
+    {
+      "name": "DJ Samples  4",
+      "file": "audio/dj_Samples_4.mp3"
     },
     {
       "name": "drama",
       "file": "audio/drama.mp3"
     },
     {
+      "name": "itchy",
+      "file": "audio/itchy.mp3"
+    },
+    {
+      "name": "phaser",
+      "file": "audio/phaser.mp3"
+    },
+    {
       "name": "pullover",
       "file": "audio/pullover.mp3"
+    },
+    {
+      "name": "scratch fast",
+      "file": "audio/scratch_fast.mp3"
+    },
+    {
+      "name": "what the what",
+      "file": "audio/what_the_what.mp3"
+    },
+    {
+      "name": "whistle 1",
+      "file": "audio/whistle_1.mp3"
+    },
+    {
+      "name": "worked up",
+      "file": "audio/worked_up.mp3"
     }
   ]
 }
