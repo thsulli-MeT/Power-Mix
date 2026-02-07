@@ -1,30 +1,46 @@
 {
-  "library": [
-    "0 Lead Vocals_01.mp3",
-    "1 Instrumental_01.mp3",
-    "123yeah.mp3",
-    "42woo.mp3",
-    "bam.mp3",
-    "big_talker.mp3",
-    "chichibam.mp3",
-    "chirp.mp3",
-    "chopper.mp3",
-    "Demo Track 1.mp3",
-    "Demo Track 2.mp3",
-    "dj_Samples_1.mp3",
-    "dj_Samples_2.mp3",
-    "dj_Samples_3.mp3",
-    "dj_Samples_4.mp3",
-    "drama.mp3",
-    "Im_not_a_DJ.mp3",
-    "itchy.mp3",
-    "phaser.mp3",
-    "pullover.mp3",
-    "Scratch_3.mp3",
-    "scratch_fast.mp3",
-    "Slop_this.mp3",
-    "what_the_what.mp3",
-    "whistle_1.mp3",
-    "worked_up.mp3"
+  "tracks": [
+    {
+      "name": "DJ Samples 1",
+      "file": "audio/dj_Samples_1.mp3"
+    },
+    {
+      "name": "DJ Samples 2",
+      "file": "audio/dj_Samples_2.mp3"
+    }
+  ],
+  "samples": [
+    {
+      "name": "whistle 1",
+      "file": "audio/whistle_1.mp3"
+    },
+    {
+      "name": "chirp",
+      "file": "audio/chirp.mp3"
+    },
+    {
+      "name": "Scratch 3",
+      "file": "audio/Scratch_3.mp3"
+    },
+    {
+      "name": "phaser",
+      "file": "audio/phaser.mp3"
+    },
+    {
+      "name": "scratch fast",
+      "file": "audio/scratch_fast.mp3"
+    },
+    {
+      "name": "itchy",
+      "file": "audio/itchy.mp3"
+    },
+    {
+      "name": "drama",
+      "file": "audio/drama.mp3"
+    },
+    {
+      "name": "pullover",
+      "file": "audio/pullover.mp3"
+    }
   ]
 }
