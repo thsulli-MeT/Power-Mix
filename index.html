@@ -24,7 +24,11 @@
     </div>
 
     <div class="sponsor-box" id="sponsorRight">
-      <div class="sponsor-inner">Sponsor 2</div>
+      <div class="sponsor-inner">
+        <a class="sponsor-link" href="https://shortmusicvideos.com" target="_blank" rel="noopener" aria-label="shortmusicvideos.com">
+          <img src="assets/SMVBW.png" alt="sMV Short Music Videos" class="sponsor-img" />
+        </a>
+      </div>
     </div>
   </header>
 
@@ -145,12 +149,12 @@
         <div class="library">
           <div class="block-title">Library</div>
           <div class="row">
-            <button id="scanAudio" class="btn ghost">Scan /audio folder</button>
+            <button id="openLibrary" class="btn ghost">Open Library</button>
             <button id="clearQueue" class="btn ghost">Clear</button>
           </div>
-          <div class="note">Drop .wav/.mp3 files into <b>audio/</b>, then click Scan.</div>
-          <div id="libList" class="liblist"></div>
-        </div>
+          <div id="libInline" class="liblist"></div>
+          <div class="note">Library auto-loads from <b>audio/library.json</b>. <b>Shift</b> = local file picker • <b>Option/Alt</b> = load to other deck.</div>
+</div>
       </section>
     </div>
 

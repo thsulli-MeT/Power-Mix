@@ -421,3 +421,7 @@ body{
   border-radius:12px; padding:10px 12px; font-weight:900;
 }
 .lib-pop .btn:hover{ background: rgba(255,255,255,.10); }
+
+
+.sponsor-link{display:flex;align-items:center;justify-content:center;width:100%;height:100%;}
+.sponsor-img{max-width:92%;max-height:92%;object-fit:contain;}

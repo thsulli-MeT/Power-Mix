@@ -509,6 +509,34 @@ async function loadManifest(){
   }
 }
 
+function renderInlineLibrary(items, opts={}){
+  const el = $("libInline");
+  if(!el) return;
+  el.innerHTML = "";
+  if(!items || !items.length){
+    el.innerHTML = '<div class="note">No items found. Add files to <b>audio/</b> and update <b>audio/library.json</b>.</div>';
+    return;
+  }
+  const def = (opts.defaultDeck||"A").toUpperCase();
+  const base = (def==="B") ? "B" : "A";
+  const other = (base==="A") ? "B" : "A";
+
+  items.forEach((it)=>{
+    const row = document.createElement("button");
+    row.className = "librow";
+    row.type="button";
+    row.textContent = it.name || it.file?.split("/").pop() || "track";
+    row.title = "Click: load to "+base+" • Option/Alt: load to "+other;
+    row.addEventListener("click", async (e)=>{
+      const target = (e.altKey || e.metaKey || e.ctrlKey) ? other : base;
+      if(!unlocked) await enableAudio();
+      await loadManifest();
+      await loadTrackToDeck(it.file, target);
+    });
+    el.appendChild(row);
+  });
+}
+
 function ensureLibraryPopup(){
   if(document.getElementById("libPop")) return;
   const wrap=document.createElement("div");
@@ -529,7 +557,7 @@ function ensureLibraryPopup(){
   document.getElementById("libBack").onclick = ()=> wrap.classList.remove("show");
 }
 
-function showLibraryPopup(items){
+function showLibraryPopup(items, opts={}){
   ensureLibraryPopup();
   const pop=document.getElementById("libPop");
   const list=document.getElementById("libList");
@@ -682,8 +710,18 @@ function wire(){
     };
     input.click();
   };
-  $("loadLocalA")?.addEventListener("click", ()=>pick(deckA));
-  $("loadLocalB")?.addEventListener("click", ()=>pick(deckB));
+  $("loadLocalA")?.addEventListener("click", async (e)=>{
+    if(e.shiftKey){ return pick(deckA); }
+    if(!unlocked) await enableAudio();
+    await loadManifest();
+    showLibraryPopup((manifest?.library||[]), { mode:"track", defaultDeck:"A" });
+  });
+  $("loadLocalB")?.addEventListener("click", async (e)=>{
+    if(e.shiftKey){ return pick(deckB); }
+    if(!unlocked) await enableAudio();
+    await loadManifest();
+    showLibraryPopup((manifest?.library||[]), { mode:"track", defaultDeck:"B" });
+  });
   $("playA")?.addEventListener("click", ()=>deckA.playPause());
   $("playB")?.addEventListener("click", ()=>deckB.playPause());
 
@@ -708,20 +746,15 @@ function wire(){
   $("waveB")?.addEventListener("click",(e)=>seekFromWave(e, deckB, $("waveB")));
 
   $("runTransition")?.addEventListener("click", async ()=>{ if(!unlocked) await enableAudio(); runTransition(); });
-
-  // library scan
-  $("scanAudio")?.addEventListener("click", async ()=>{
-    try{
-      if(!unlocked) await enableAudio();
-      const items = await scanAudio();
-      renderLib(items);
-    }catch(err){
-      alert("Library scan failed. Use http://localhost:8080 (not file://).");
-    }
+  // library (GitHub /audio via library.json)
+  $("openLibrary")?.addEventListener("click", async ()=>{
+    if(!unlocked) await enableAudio();
+    await loadManifest();
+    renderInlineLibrary((manifest?.library||[]), { defaultDeck:"A" });
+    showLibraryPopup(manifest?.library || [], { mode:"track", defaultDeck:"A" });
   });
-  $("clearQueue")?.addEventListener("click", ()=>{ const ll=$("libList"); if(ll) ll.innerHTML=""; });
-
-  // shortcuts modal
+  $("clearQueue")?.addEventListener("click", ()=>{ const ll=$("libList"); if(ll) ll.innerHTML=""; const il=$("libInline"); if(il) il.innerHTML=""; });
+// shortcuts modal
   $("shortcutsBtn")?.addEventListener("click", ()=> $("shortcutsModal")?.classList.remove("hidden"));
   $("closeShortcuts")?.addEventListener("click", ()=> $("shortcutsModal")?.classList.add("hidden"));
 }
@@ -827,4 +860,10 @@ document.addEventListener("keydown",(e)=>{
       showLibraryPopup(items.map(x=>({name:x.name||x.file,file:x.file})));
     });
   }
+});
+
+// Auto-load library metadata on startup (no audio decoding until user enables WebAudio)
+window.addEventListener("DOMContentLoaded", async ()=>{
+  await loadManifest();
+  renderInlineLibrary((manifest?.library||[]), { defaultDeck:"A" });
 });
