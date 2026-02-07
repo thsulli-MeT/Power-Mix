@@ -1,1 +1,0 @@
-Drop .wav or .mp3 files in this folder, then click 'Scan /audio folder' in the app.
