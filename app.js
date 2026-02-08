@@ -322,8 +322,14 @@ function renderSamplePads(){
     pad.addEventListener("click", async (e)=>{
       if(e.altKey){
         if(!manifest) await loadManifest();
-        const items=(manifest && Array.isArray(manifest.samples)) ? manifest.samples : [];
-        showLibraryPopup(items.map(x=>({name:x.name||x.file,file:x.file})));
+        const items = (manifest && Array.isArray(manifest.library)) ? manifest.library : [];
+        showPickerPopup(items, "Pick a sample for PAD "+(i+1), async (it)=>{
+          if(!unlocked) await enableAudio();
+          await loadManifest();
+          const url = it.path || it.file;
+          const name = it.title || it.name || (url? url.split("/").pop():"sample");
+          await loadSampleFromURL(i, url, name);
+        });
         return;
       }
 
@@ -434,11 +440,27 @@ async function enableAudio(){
   deckA.connect();
   deckB.connect();
   unlocked = true;
+  if(!manifest) await loadManifest();
+  try{
+    if(manifest?.preload?.A) await deckA.loadFromUrl(encodeURI(manifest.preload.A));
+    if(manifest?.preload?.B) await deckB.loadFromUrl(encodeURI(manifest.preload.B));
+  }catch(e){ console.warn("Deck preload failed", e); }
+  initSamplesFromManifest();
+  try{ await preloadSamplesFromManifest(); }catch(e){ console.warn("Sample preload failed", e); }
 
   const btn = $("enableAudio");
   if(btn){
     btn.classList.remove("flash-until-enabled");
     btn.textContent="Audio Enabled";
+    // after unlocking audio, preload decks & samples
+    if(!manifest) await loadManifest();
+    try{
+      if(manifest?.preload?.A) await loadTrackToDeck(manifest.preload.A, "A");
+      if(manifest?.preload?.B) await loadTrackToDeck(manifest.preload.B, "B");
+      initSamplesFromManifest();
+      await preloadSamplesFromManifest();
+    }catch(e){ console.warn("Preload failed", e); }
+
   }
   const hint = document.querySelector(".start-hint");
   if(hint) hint.textContent = "Audio ready";
@@ -509,34 +531,6 @@ async function loadManifest(){
   }
 }
 
-function renderInlineLibrary(items, opts={}){
-  const el = $("libInline");
-  if(!el) return;
-  el.innerHTML = "";
-  if(!items || !items.length){
-    el.innerHTML = '<div class="note">No items found. Add files to <b>audio/</b> and update <b>audio/library.json</b>.</div>';
-    return;
-  }
-  const def = (opts.defaultDeck||"A").toUpperCase();
-  const base = (def==="B") ? "B" : "A";
-  const other = (base==="A") ? "B" : "A";
-
-  items.forEach((it)=>{
-    const row = document.createElement("button");
-    row.className = "librow";
-    row.type="button";
-    row.textContent = it.name || it.file?.split("/").pop() || "track";
-    row.title = "Click: load to "+base+" • Option/Alt: load to "+other;
-    row.addEventListener("click", async (e)=>{
-      const target = (e.altKey || e.metaKey || e.ctrlKey) ? other : base;
-      if(!unlocked) await enableAudio();
-      await loadManifest();
-      await loadTrackToDeck(it.file, target);
-    });
-    el.appendChild(row);
-  });
-}
-
 function ensureLibraryPopup(){
   if(document.getElementById("libPop")) return;
   const wrap=document.createElement("div");
@@ -557,7 +551,7 @@ function ensureLibraryPopup(){
   document.getElementById("libBack").onclick = ()=> wrap.classList.remove("show");
 }
 
-function showLibraryPopup(items, opts={}){
+function showLibraryPopup(items){
   ensureLibraryPopup();
   const pop=document.getElementById("libPop");
   const list=document.getElementById("libList");
@@ -566,25 +560,86 @@ function showLibraryPopup(items, opts={}){
     const row=document.createElement("div");
     row.className="row";
     row.innerHTML = `<div>
-        <div class="name">${it.name||it.file}</div>
-        <div class="hint">${it.file}</div>
+        <div class="name">${it.title||it.name||it.file||it.path}</div>
+        <div class="hint">${it.file||it.path}</div>
       </div>
       <div class="hint">A / B</div>`;
     row.addEventListener("click",(e)=>{
       const toB = e.altKey; // option on mac
-      loadTrackToDeck(it.file, toB ? "B" : "A");
+      loadTrackToDeck(it.file||it.path, toB ? "B" : "A");
       pop.classList.remove("show");
     });
     list.appendChild(row);
   });
   pop.classList.add("show");
 }
+function showPickerPopup(items, titleText, onPick){
+  ensureLibraryPopup();
+  const pop=document.getElementById("libPop");
+  const list=document.getElementById("libList");
+  const title=document.getElementById("libTitle");
+  if(title) title.textContent = titleText || "Library";
+  list.innerHTML="";
+  items.forEach(it=>{
+    const row=document.createElement("div");
+    row.className="row";
+    const name = it.title || it.name || it.file || it.path || "";
+    const file = it.file || it.path || "";
+    row.innerHTML = `<div>
+        <div class="name">${name}</div>
+        <div class="hint">${file}</div>
+      </div>
+      <div class="hint">click</div>`;
+    row.addEventListener("click", async (e)=>{
+      pop.classList.remove("show");
+      try{ await onPick(it, e); }catch(err){ console.warn(err); }
+    });
+    list.appendChild(row);
+  });
+  pop.classList.add("show");
+}
+
+async function loadSampleFromURL(slot, url, name){
+  if(!audioCtx) return;
+  const safeUrl = encodeURI(url);
+  const res = await fetch(safeUrl, { cache:"no-store" });
+  if(!res.ok) throw new Error("Sample fetch failed: "+res.status);
+  const ab = await res.arrayBuffer();
+  const decoded = await audioCtx.decodeAudioData(ab.slice(0));
+  sampleBank[slot] = { name: name || (url.split("/").pop()||"sample"), buffer: decoded, url: url };
+  renderSamplePads();
+}
+
+function initSamplesFromManifest(){
+  if(!manifest) return;
+  const s = Array.isArray(manifest.samples) ? manifest.samples : [];
+  for(let i=0;i<8;i++){
+    if(s[i]){
+      const p = s[i].path || s[i].file;
+      sampleBank[i] = { name: s[i].name || s[i].title || (p? p.split("/").pop() : `PAD ${i+1}`), buffer: sampleBank[i]?.buffer||null, url: p };
+    }
+  }
+  renderSamplePads();
+}
+
+async function preloadSamplesFromManifest(){
+  if(!manifest || !audioCtx) return;
+  const s = Array.isArray(manifest.samples) ? manifest.samples : [];
+  for(let i=0;i<8;i++){
+    const p = s[i]?.path || s[i]?.file;
+    if(!p) continue;
+    // skip if already decoded
+    if(sampleBank[i]?.buffer) continue;
+    await loadSampleFromURL(i, p, s[i]?.name);
+  }
+}
+
 
 async function preloadFromManifest(){
   if(!manifest || !audioCtx) return;
   const t = Array.isArray(manifest.tracks) ? manifest.tracks : [];
-  if(t[0]?.file) await loadTrackToDeck(t[0].file, "A");
-  if(t[1]?.file) await loadTrackToDeck(t[1].file, "B");
+  if(a) await loadTrackToDeck(a, "A");
+  if(b) await loadTrackToDeck(b, "B");
 
   const s = Array.isArray(manifest.samples) ? manifest.samples : [];
   for(let i=0;i<8;i++){
@@ -710,18 +765,8 @@ function wire(){
     };
     input.click();
   };
-  $("loadLocalA")?.addEventListener("click", async (e)=>{
-    if(e.shiftKey){ return pick(deckA); }
-    if(!unlocked) await enableAudio();
-    await loadManifest();
-    showLibraryPopup((manifest?.library||[]), { mode:"track", defaultDeck:"A" });
-  });
-  $("loadLocalB")?.addEventListener("click", async (e)=>{
-    if(e.shiftKey){ return pick(deckB); }
-    if(!unlocked) await enableAudio();
-    await loadManifest();
-    showLibraryPopup((manifest?.library||[]), { mode:"track", defaultDeck:"B" });
-  });
+  $("loadLocalA")?.addEventListener("click", ()=>pick(deckA));
+  $("loadLocalB")?.addEventListener("click", ()=>pick(deckB));
   $("playA")?.addEventListener("click", ()=>deckA.playPause());
   $("playB")?.addEventListener("click", ()=>deckB.playPause());
 
@@ -731,14 +776,21 @@ function wire(){
 
   // crossfader
   const cross=$("cross");
+  const volA=$("volA");
+  const volB=$("volB");
+  let volAVal=1.0;
+  let volBVal=1.0;
   const apply=()=>{
     const x=parseFloat(cross?.value ?? "0.5");
     const a=Math.cos(x*Math.PI/2);
     const b=Math.sin(x*Math.PI/2);
-    deckA.setGain(a); deckB.setGain(b);
+    deckA.setGain(a*volAVal);
+    deckB.setGain(b*volBVal);
     setMixView(x);
   };
   cross?.addEventListener("input", apply);
+  volA?.addEventListener("input", ()=>{ volAVal=parseFloat(volA.value); apply(); });
+  volB?.addEventListener("input", ()=>{ volBVal=parseFloat(volB.value); apply(); });
   setMixView(0.5);
 
   // waveform seek
@@ -746,15 +798,24 @@ function wire(){
   $("waveB")?.addEventListener("click",(e)=>seekFromWave(e, deckB, $("waveB")));
 
   $("runTransition")?.addEventListener("click", async ()=>{ if(!unlocked) await enableAudio(); runTransition(); });
-  // library (GitHub /audio via library.json)
-  $("openLibrary")?.addEventListener("click", async ()=>{
-    if(!unlocked) await enableAudio();
-    await loadManifest();
-    renderInlineLibrary((manifest?.library||[]), { defaultDeck:"A" });
-    showLibraryPopup(manifest?.library || [], { mode:"track", defaultDeck:"A" });
-  });
-  $("clearQueue")?.addEventListener("click", ()=>{ const ll=$("libList"); if(ll) ll.innerHTML=""; const il=$("libInline"); if(il) il.innerHTML=""; });
-// shortcuts modal
+
+  // library scan
+  $("scanAudio")?.addEventListener("click", async ()=>{
+  try{
+    const items = await scanAudio();
+    renderLib(items);
+    // also refresh sample labels
+    if(!manifest) await loadManifest();
+    initSamplesFromManifest();
+    if(unlocked) await preloadSamplesFromManifest();
+  }catch(err){
+    console.warn(err);
+    alert("Library refresh failed. Use http://localhost:8080 (not file://).");
+  }
+});
+  $("clearQueue")?.addEventListener("click", ()=>{ const ll=$("libList"); if(ll) ll.innerHTML=""; });
+
+  // shortcuts modal
   $("shortcutsBtn")?.addEventListener("click", ()=> $("shortcutsModal")?.classList.remove("hidden"));
   $("closeShortcuts")?.addEventListener("click", ()=> $("shortcutsModal")?.classList.add("hidden"));
 }
@@ -768,6 +829,16 @@ function seekFromWave(e, deck, canvas){
 }
 
 async function scanAudio(){
+  // Prefer manifest (works on GitHub Pages)
+  if(!manifest) await loadManifest();
+  if(manifest && Array.isArray(manifest.library) && manifest.library.length){
+    return manifest.library.map(it=>{
+      const url = it.path || it.file;
+      const name = it.title || it.name || (url ? url.split("/").pop() : "track");
+      return { name, url };
+    });
+  }
+  // Fallback for local folder listing
   const res = await fetch("audio/");
   const txt = await res.text();
   const matches = [...txt.matchAll(/href="([^"]+\.(?:mp3|wav))"/gi)].map(m=>m[1]);
@@ -779,30 +850,57 @@ function renderLib(items){
   wrap.innerHTML="";
   items.forEach(it=>{
     const row=document.createElement("div");
+    row.className="lib-row";
     row.style.display="grid";
-    row.style.gridTemplateColumns="1fr auto auto";
+    row.style.gridTemplateColumns="1fr auto auto auto";
     row.style.gap="8px";
     row.style.alignItems="center";
     row.style.padding="8px";
     row.style.borderBottom="1px solid rgba(255,255,255,.06)";
+
     const name=document.createElement("div");
-    name.textContent=it.name; name.style.fontWeight="900"; name.style.opacity=".9";
+    name.textContent=it.name || "track";
+    name.style.fontWeight="900"; name.style.opacity=".9";
+
     const a=document.createElement("button");
     a.className="btn ghost"; a.textContent="Load A";
     a.addEventListener("click", async ()=>{
       if(!unlocked) await enableAudio();
-      await deckA.loadFromUrl(it.url); updateMeta(); redraw();
+      await deckA.loadFromUrl(encodeURI(it.url)); updateMeta(); redraw();
     });
+
     const b=document.createElement("button");
     b.className="btn ghost"; b.textContent="Load B";
     b.addEventListener("click", async ()=>{
       if(!unlocked) await enableAudio();
-      await deckB.loadFromUrl(it.url); updateMeta(); redraw();
+      await deckB.loadFromUrl(encodeURI(it.url)); updateMeta(); redraw();
     });
-    row.appendChild(name); row.appendChild(a); row.appendChild(b);
+
+    const sWrap=document.createElement("div");
+    sWrap.className="sample-assign";
+    for(let i=0;i<8;i++){
+      const sb=document.createElement("button");
+      sb.className="btn ghost sbtn";
+      sb.textContent=String(i+1);
+      sb.title="Assign to sample "+(i+1);
+      sb.addEventListener("click", async (e)=>{
+        e.stopPropagation();
+        const url = it.url;
+        const label = it.name || (url? url.split("/").pop():"sample");
+        // assign label immediately
+        sampleBank[i] = { name: label, buffer: sampleBank[i]?.buffer||null, url };
+        renderSamplePads();
+        if(!unlocked) return; // user can enable audio when ready
+        try{ await loadSampleFromURL(i, url, label); }catch(err){ console.warn(err); }
+      });
+      sWrap.appendChild(sb);
+    }
+
+    row.appendChild(name); row.appendChild(a); row.appendChild(b); row.appendChild(sWrap);
     wrap.appendChild(row);
   });
 }
+
 
 
 function runTransition(){
@@ -862,8 +960,9 @@ document.addEventListener("keydown",(e)=>{
   }
 });
 
-// Auto-load library metadata on startup (no audio decoding until user enables WebAudio)
 window.addEventListener("DOMContentLoaded", async ()=>{
   await loadManifest();
-  renderInlineLibrary((manifest?.library||[]), { defaultDeck:"A" });
+  initSamplesFromManifest();
+  const items = await scanAudio();
+  renderLib(items);
 });
