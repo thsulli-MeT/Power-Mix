@@ -25,8 +25,8 @@
 
     <div class="sponsor-box" id="sponsorRight">
       <div class="sponsor-inner">
-        <a class="sponsor-link" href="https://shortmusicvideos.com" target="_blank" rel="noopener" aria-label="shortmusicvideos.com">
-          <img src="assets/SMVBW.png" alt="sMV Short Music Videos" class="sponsor-img" />
+        <a class="smv-link" href="https://shortmusicvideos.com" target="_blank" rel="noopener" aria-label="Short Music Videos">
+          <img class="smv-banner-logo" src="assets/SMVBW.png" alt="SMV Short Music Videos" />
         </a>
       </div>
     </div>
@@ -93,15 +93,26 @@
       <section class="center card">
         <div class="center-title">Crossfader</div>
 
+        <div class="xfader-area">
+          <div class="vol-strip left">
+          <input id="volA" class="vol-fader a" type="range" min="0" max="1" step="0.001" value="0.90" aria-label="Deck A Volume" orient="vertical">
+          <div class="vol-label a">VOLUME</div>
+        </div>
         <div class="xfader-wrap">
-          <div class="xfader-head">
-            <span class="a">A</span>
-            <span class="mid">Crossfader</span>
-            <span class="b">B</span>
+            <div class="xfader-head">
+              <span class="a">A</span>
+              <span class="mid"></span>
+              <span class="b">B</span>
+            </div>
+            <input id="cross" type="range" min="0" max="1" step="0.001" value="0.5"/>
+            <div class="mixview"><div id="mixfill" class="mixfill"></div></div>
+            <label class="chk"><input id="quickCross" type="checkbox"/> Quick Cross</label>
           </div>
-          <input id="cross" type="range" min="0" max="1" step="0.001" value="0.5"/>
-          <div class="mixview"><div id="mixfill" class="mixfill"></div></div>
-          <label class="chk"><input id="quickCross" type="checkbox"/> Quick Cross</label>
+
+          <div class="vol-strip right" title="Deck B volume">
+            <div class="vol-label">VOLUME</div>
+            <input id="volB" class="vol-fader" type="range" min="0" max="1" step="0.01" value="1" / orient="vertical">
+          </div>
         </div>
 
         <div class="transitions">
@@ -127,7 +138,7 @@
         </div>
 
         <div class="syncassist">
-          <div class="block-title">Sync Assist</div>
+          <div class="block-title">BPM</div>
           <div class="bpm-row">
             <div class="bpm">
               <div class="bpm-label">Deck A BPM</div>
@@ -138,23 +149,17 @@
               <div id="bpmB" class="bpm-val">—</div>
             </div>
           </div>
-          <div class="row">
-            <button id="tapBpmB" class="btn ghost">Tap BPM (B)</button>
-            <button id="matchBpm" class="btn primary">Match BPM</button>
-            <button id="resetRates" class="btn ghost">Reset Rates</button>
-          </div>
-          <div class="note">Tap BPM is manual for now. Match BPM adjusts Deck B playback rate to Deck A.</div>
-        </div>
+</div>
 
         <div class="library">
           <div class="block-title">Library</div>
           <div class="row">
-            <button id="openLibrary" class="btn ghost">Open Library</button>
+            <button id="scanAudio" class="btn ghost">Scan /audio folder</button>
             <button id="clearQueue" class="btn ghost">Clear</button>
           </div>
-          <div id="libInline" class="liblist"></div>
-          <div class="note">Library auto-loads from <b>audio/library.json</b>. <b>Shift</b> = local file picker • <b>Option/Alt</b> = load to other deck.</div>
-</div>
+          <div class="note">Drop .wav/.mp3 files into <b>audio/</b>, then click Scan.</div>
+          <div id="libList" class="liblist"></div>
+        </div>
       </section>
     </div>
 
