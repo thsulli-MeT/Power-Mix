@@ -504,12 +504,16 @@ function playScratchGrain(deck, tSec, direction){
   const dur = deck.scratchBuffer.duration || 0;
   if(dur<=0) return;
 
-  const grainDur = 0.04; // 40ms
-  const rate = 1.0 + Math.min(2.5, Math.abs(direction)*0.06);
-  const gainVal = 0.52;
+  const speed = Math.abs(direction);
+  const grainDur = Math.max(0.016, 0.038 - Math.min(0.02, speed * 0.000025));
+  const rate = Math.max(0.78, Math.min(1.35, 1 + direction * 0.0005));
+  const gainVal = Math.max(0.22, Math.min(0.62, 0.3 + speed * 0.00015));
+  const now = audioCtx.currentTime;
 
   const g = audioCtx.createGain();
-  g.gain.value = gainVal;
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.linearRampToValueAtTime(gainVal, now + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + grainDur);
   g.connect(audioCtx.destination);
 
   const src = audioCtx.createBufferSource();
@@ -519,13 +523,15 @@ function playScratchGrain(deck, tSec, direction){
     src.buffer = deck.scratchBuffer;
     const offset = Math.max(0, Math.min(dur - grainDur, tSec));
     src.connect(g);
-    src.start(0, offset, grainDur);
+    src.start(now, offset, grainDur);
   }else{
     src.buffer = deck.scratchBufferRev;
     const revOffset = Math.max(0, Math.min(dur - grainDur, (dur - tSec) - grainDur));
     src.connect(g);
-    src.start(0, revOffset, grainDur);
+    src.start(now, revOffset, grainDur);
   }
+
+  src.stop(now + grainDur + 0.005);
 }
 
 let manifest = null;
@@ -700,8 +706,8 @@ function wireScratch(platterId, deck){
   let wasPlaying = false;
   let lastGrainAt = 0;
 
-  const scratchSecondsPerRad = 0.12;
-  const grainAngleThreshold = 0.012;
+  const scratchSecondsPerRad = 0.095;
+  const grainAngleThreshold = 0.008;
 
   const pointerAngle = (e)=>{
     const r = el.getBoundingClientRect();
@@ -747,8 +753,8 @@ function wireScratch(platterId, deck){
     deck.audio.currentTime = t;
 
     // Rotation creates scratch grains
-    if(Math.abs(dAngle) >= grainAngleThreshold && (now - lastGrainAt) > 14){
-      playScratchGrain(deck, t, dAngle * 1000);
+    if(Math.abs(dAngle) >= grainAngleThreshold && (now - lastGrainAt) > 9){
+      playScratchGrain(deck, t, dAngle * 700);
       lastGrainAt = now;
     }
 
