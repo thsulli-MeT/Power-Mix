@@ -32,8 +32,13 @@ async function decodeDeckBuffer(deck){
     const res = await fetch(deck.audio.src, {cache:"no-store"});
     const ab = await res.arrayBuffer();
     const decoded = await audioCtx.decodeAudioData(ab.slice(0));
-    deck.buffer = decoded;
-    deck.bufferRev = reverseBuffer(decoded);
+    deck.scratchBuffer = decoded;
+    deck.scratchBufferRev = reverseBuffer(decoded);
+    if(!deck.waveform){
+      const ch0 = decoded.getChannelData(0);
+      deck.waveform = ch0.slice(0, Math.min(ch0.length, 1200*600));
+    }
+    if(!deck.duration) deck.duration = decoded.duration || 0;
   }catch(e){
     // ignore
   }
@@ -151,13 +156,16 @@ class Deck {
     this.convolver = null;
     this.reverbMix = null;
 
-    this.buffer = null;
+    this.waveform = null;
+    this.scratchBuffer = null;
+    this.scratchBufferRev = null;
     this.duration = 0;
     this.hot = Array(8).fill(null);
     this.bpm = null;
 
     this.platterAngle = 0;
     this.platterVel = 0;
+    this.isScratching = false;
   }
 
   connect(){
@@ -231,7 +239,9 @@ class Deck {
   _setDecoded(decoded){
     this.duration = decoded.duration || 0;
     const ch0 = decoded.getChannelData(0);
-    this.buffer = ch0.slice(0, Math.min(ch0.length, 1200*600));
+    this.waveform = ch0.slice(0, Math.min(ch0.length, 1200*600));
+    this.scratchBuffer = decoded;
+    this.scratchBufferRev = reverseBuffer(decoded);
     this.bpm = estimateBPM(ch0, decoded.sampleRate);
   }
   playPause(){ this.audio.paused ? this.audio.play() : this.audio.pause(); }
@@ -242,6 +252,7 @@ class Deck {
   clearHot(i){ this.hot[i]=null; }
 
   tick(dt){
+    if(this.isScratching) return;
     const playing = !this.audio.paused && isFinite(this.audio.currentTime);
     const baseRps = playing ? (this.audio.playbackRate||1) * 0.55 : 0.0;
     this.platterVel += (baseRps*2*Math.PI - this.platterVel) * Math.min(1, dt*6);
@@ -472,14 +483,14 @@ function redraw(){
   const cA=$("waveA"), cB=$("waveB");
   if(cA){ cA.width = Math.max(600, Math.floor(cA.clientWidth))*2; cA.height = 160; }
   if(cB){ cB.width = Math.max(600, Math.floor(cB.clientWidth))*2; cB.height = 160; }
-  drawWave(cA, deckA.buffer, "rgba(255,75,75,.95)");
-  drawWave(cB, deckB.buffer, "rgba(53,215,255,.95)");
+  drawWave(cA, deckA.waveform, "rgba(255,75,75,.95)");
+  drawWave(cB, deckB.waveform, "rgba(53,215,255,.95)");
 }
 
 function overlays(){
   const cA=$("waveA"), cB=$("waveB");
-  drawWave(cA, deckA.buffer, "rgba(255,75,75,.95)");
-  drawWave(cB, deckB.buffer, "rgba(53,215,255,.95)");
+  drawWave(cA, deckA.waveform, "rgba(255,75,75,.95)");
+  drawWave(cB, deckB.waveform, "rgba(53,215,255,.95)");
   drawHotMarks(cA, deckA.hot, deckA.duration || deckA.audio.duration || 0, "rgba(255,255,255,.35)");
   drawHotMarks(cB, deckB.hot, deckB.duration || deckB.audio.duration || 0, "rgba(255,255,255,.35)");
   drawPlayhead(cA, deckA.audio.currentTime, deckA.duration || deckA.audio.duration || 0);
@@ -489,13 +500,13 @@ function overlays(){
 
 
 function playScratchGrain(deck, tSec, direction){
-  if(!audioCtx || !deck.buffer || !deck.bufferRev) return;
-  const dur = deck.buffer.duration || 0;
+  if(!audioCtx || !deck.scratchBuffer || !deck.scratchBufferRev) return;
+  const dur = deck.scratchBuffer.duration || 0;
   if(dur<=0) return;
 
   const grainDur = 0.04; // 40ms
-  const rate = 1.0 + Math.min(2.5, Math.abs(direction)*0.02);
-  const gainVal = 0.6;
+  const rate = 1.0 + Math.min(2.5, Math.abs(direction)*0.06);
+  const gainVal = 0.52;
 
   const g = audioCtx.createGain();
   g.gain.value = gainVal;
@@ -505,12 +516,12 @@ function playScratchGrain(deck, tSec, direction){
   src.playbackRate.value = rate;
 
   if(direction >= 0){
-    src.buffer = deck.buffer;
+    src.buffer = deck.scratchBuffer;
     const offset = Math.max(0, Math.min(dur - grainDur, tSec));
     src.connect(g);
     src.start(0, offset, grainDur);
   }else{
-    src.buffer = deck.bufferRev;
+    src.buffer = deck.scratchBufferRev;
     const revOffset = Math.max(0, Math.min(dur - grainDur, (dur - tSec) - grainDur));
     src.connect(g);
     src.start(0, revOffset, grainDur);
@@ -683,24 +694,37 @@ function wireScratch(platterId, deck){
   if(!el) return;
 
   let dragging = false;
-  let startX = 0;
-  let startTime = 0;
+  let lastAngle = 0;
+  let lastMoveAt = 0;
+  let lastAngularSpeed = 0;
   let wasPlaying = false;
-  let lastY = 0;
   let lastGrainAt = 0;
 
-  const jogPxToSeconds = 0.01; // horizontal jog
-  const scratchThreshold = 3;  // px of vertical motion before we fire grain
+  const scratchSecondsPerRad = 0.12;
+  const grainAngleThreshold = 0.012;
+
+  const pointerAngle = (e)=>{
+    const r = el.getBoundingClientRect();
+    const cx = r.left + r.width/2;
+    const cy = r.top + r.height/2;
+    return Math.atan2(e.clientY - cy, e.clientX - cx);
+  };
+  const normalizeAngle = (a)=>{
+    if(a > Math.PI) return a - Math.PI*2;
+    if(a < -Math.PI) return a + Math.PI*2;
+    return a;
+  };
 
   el.addEventListener("pointerdown", (e)=>{
     if(!deck.audio.src) return;
     el.setPointerCapture(e.pointerId);
     dragging = true;
-    startX = e.clientX;
-    startTime = deck.audio.currentTime || 0;
+    lastAngle = pointerAngle(e);
+    lastMoveAt = performance.now();
+    lastAngularSpeed = 0;
     wasPlaying = !deck.audio.paused;
-    lastY = e.clientY;
     lastGrainAt = 0;
+    deck.isScratching = true;
 
     // Pause media element; scratch audio comes from grains
     deck.audio.pause();
@@ -709,34 +733,36 @@ function wireScratch(platterId, deck){
   el.addEventListener("pointermove", (e)=>{
     if(!dragging) return;
 
-    const dx = e.clientX - startX;
-    const dy = e.clientY - lastY;
+    const angle = pointerAngle(e);
+    const dAngle = normalizeAngle(angle - lastAngle);
+    const now = performance.now();
+    const dt = Math.max(0.001, (now - lastMoveAt) / 1000);
+    lastAngularSpeed = dAngle / dt;
 
     const dur = deck.duration || deck.audio.duration || 0;
     if(dur<=0) return;
 
-    // horizontal jog moves playhead
-    const t = Math.max(0, Math.min(dur, startTime + dx*jogPxToSeconds));
+    // Rotational jog moves playhead in both directions (pullback/forward)
+    const t = Math.max(0, Math.min(dur, (deck.audio.currentTime || 0) + dAngle * scratchSecondsPerRad));
     deck.audio.currentTime = t;
 
-    // vertical motion creates scratch grains
-    const now = performance.now();
-    if(Math.abs(dy) >= scratchThreshold && (now - lastGrainAt) > 18){
-      // up = forward, down = backward
-      playScratchGrain(deck, t, -dy);
+    // Rotation creates scratch grains
+    if(Math.abs(dAngle) >= grainAngleThreshold && (now - lastGrainAt) > 14){
+      playScratchGrain(deck, t, dAngle * 1000);
       lastGrainAt = now;
     }
 
-    deck.platterAngle += dx * 0.002;
+    deck.platterAngle += dAngle;
 
-    startX = e.clientX;
-    startTime = t;
-    lastY = e.clientY;
+    lastAngle = angle;
+    lastMoveAt = now;
   });
 
   const end = ()=>{
     if(!dragging) return;
     dragging = false;
+    deck.isScratching = false;
+    deck.platterVel = Math.max(-12, Math.min(12, lastAngularSpeed * 0.35));
     if(wasPlaying) deck.audio.play();
   };
   el.addEventListener("pointerup", end);
