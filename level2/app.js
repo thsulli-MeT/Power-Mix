@@ -55,6 +55,7 @@ class Deck{
     this.duration=0; this.waveform=null; this.scratchBuffer=null; this.scratchBufferRev=null;
     this.platterAngle=0; this.platterVel=0; this.isScratching=false;
     this.cuePoint=0;
+    this.hot=Array(8).fill(null);
   }
 
   connect(){
@@ -92,6 +93,7 @@ class Deck{
     this.waveform=ch.slice(0, Math.min(ch.length, 1200*600));
     this.scratchBuffer=decoded; this.scratchBufferRev=reverseBuffer(decoded);
     this.cuePoint=0;
+    this.hot=Array(8).fill(null);
   }
 
   tick(dt){
@@ -133,6 +135,10 @@ function buildFx(containerId, deck){
 
 const deckA=new Deck("A");
 const deckB=new Deck("B");
+
+const sampleBank=Array(8).fill(null);
+const sampleVoices=Array(8).fill(null);
+let manifest=null;
 
 function playScratchGrain(deck,tSec,dir){
   if(!audioCtx || !deck.scratchBuffer || !deck.scratchBufferRev) return;
@@ -180,6 +186,94 @@ function wireScratch(platterId, deck){
   });
   const end=()=>{ if(!dragging) return; dragging=false; deck.isScratching=false; deck.platterVel=Math.max(-14,Math.min(14,lastSpeed*0.3)); if(wasPlaying) deck.audio.play(); };
   el.addEventListener("pointerup",end); el.addEventListener("pointercancel",end);
+}
+
+
+
+function buildHot(containerId, deck){
+  const wrap=$(containerId); if(!wrap) return; wrap.innerHTML="";
+  for(let i=0;i<8;i++){
+    const b=document.createElement("button"); b.className="hot-btn"; b.textContent=String(i+1);
+    const x=document.createElement("span"); x.className="hs-x"; x.textContent="×"; b.appendChild(x);
+    const refresh=()=>b.classList.toggle("is-set", deck.hot[i]!=null);
+    b.addEventListener("click",(e)=>{
+      if(e.target===x || e.shiftKey){ deck.hot[i]=null; refresh(); return; }
+      if(deck.hot[i]==null) deck.hot[i]=deck.audio.currentTime||0;
+      else deck.audio.currentTime=deck.hot[i];
+      refresh();
+    });
+    refresh(); wrap.appendChild(b);
+  }
+}
+
+function renderSamplePads(){
+  const wrap=$("samplePads"); if(!wrap) return; wrap.innerHTML="";
+  for(let i=0;i<8;i++){
+    const b=document.createElement("button"); b.className="sample-pad"+(sampleVoices[i]?" latched":"");
+    const label=(sampleBank[i]?.name||`PAD ${i+1}`).replace(/\.(wav|mp3)$/i,"");
+    b.textContent=label.length>10?label.slice(0,10)+"…":label;
+    b.addEventListener("click", async (e)=>{
+      if(e.shiftKey){
+        const input=document.createElement("input"); input.type="file"; input.accept=".wav,.mp3,audio/*";
+        input.onchange=async ()=>{ const file=input.files&&input.files[0]; if(!file) return; if(!unlocked) await enableAudio(); const ab=await file.arrayBuffer(); const decoded=await audioCtx.decodeAudioData(ab.slice(0)); sampleBank[i]={name:file.name, buffer:decoded}; renderSamplePads(); };
+        input.click();
+        return;
+      }
+      if(!unlocked) await enableAudio();
+      const it=sampleBank[i]; if(!it?.buffer) return;
+      if(sampleVoices[i]){ try{ sampleVoices[i].stop(); }catch(_){ } sampleVoices[i]=null; renderSamplePads(); return; }
+      const src=audioCtx.createBufferSource(); src.buffer=it.buffer; src.loop=true; src.connect(masterGain); src.start(); sampleVoices[i]=src;
+      src.onended=()=>{ if(sampleVoices[i]===src) sampleVoices[i]=null; renderSamplePads(); };
+      renderSamplePads();
+    });
+    wrap.appendChild(b);
+  }
+}
+
+async function loadManifest(){
+  try{ const res=await fetch("../audio/library.json",{cache:"no-store"}); manifest=await res.json(); return manifest; }catch(e){ manifest=null; return null; }
+}
+
+async function loadSampleFromUrl(slot,url,name){
+  if(!audioCtx) return;
+  const res=await fetch(encodeURI(url),{cache:"no-store"}); if(!res.ok) return;
+  const ab=await res.arrayBuffer(); const decoded=await audioCtx.decodeAudioData(ab.slice(0));
+  sampleBank[slot]={name:name||url.split("/").pop(), buffer:decoded, url};
+  renderSamplePads();
+}
+
+async function initSamplesFromManifest(){
+  if(!manifest) return;
+  const s=Array.isArray(manifest.samples)?manifest.samples:[];
+  for(let i=0;i<8;i++){
+    const p=s[i]?.path||s[i]?.file; if(!p) continue;
+    const n=s[i]?.name||s[i]?.title||p.split("/").pop();
+    sampleBank[i]={name:n, buffer:null, url:p};
+    if(unlocked) await loadSampleFromUrl(i,p,n);
+  }
+  renderSamplePads();
+}
+
+async function scanAudio(){
+  if(!manifest) await loadManifest();
+  if(manifest?.library?.length){
+    return manifest.library.map(it=>({name:it.title||it.name||it.file||it.path, url:it.path||it.file}));
+  }
+  return [];
+}
+
+async function renderLibrary(){
+  const wrap=$("libList"); if(!wrap) return; wrap.innerHTML="";
+  const items=await scanAudio();
+  items.forEach((it)=>{
+    const row=document.createElement("div"); row.className="lib-row";
+    const n=document.createElement("div"); n.className="lib-name"; n.textContent=it.name;
+    const a=document.createElement("button"); a.className="small-btn"; a.textContent="Load A";
+    const b=document.createElement("button"); b.className="small-btn"; b.textContent="Load B";
+    a.onclick=async ()=>{ if(!unlocked) await enableAudio(); const res=await fetch(encodeURI(it.url)); const ab=await res.arrayBuffer(); const dec=await audioCtx.decodeAudioData(ab.slice(0)); deckA.duration=dec.duration||0; const ch=dec.getChannelData(0); deckA.waveform=ch.slice(0,Math.min(ch.length,1200*600)); deckA.scratchBuffer=dec; deckA.scratchBufferRev=reverseBuffer(dec); deckA.audio.src=encodeURI(it.url); $("trackAName").textContent=it.name; drawWave($("waveA"),deckA.waveform,"#ff5f6d"); };
+    b.onclick=async ()=>{ if(!unlocked) await enableAudio(); const res=await fetch(encodeURI(it.url)); const ab=await res.arrayBuffer(); const dec=await audioCtx.decodeAudioData(ab.slice(0)); deckB.duration=dec.duration||0; const ch=dec.getChannelData(0); deckB.waveform=ch.slice(0,Math.min(ch.length,1200*600)); deckB.scratchBuffer=dec; deckB.scratchBufferRev=reverseBuffer(dec); deckB.audio.src=encodeURI(it.url); $("trackBName").textContent=it.name; drawWave($("waveB"),deckB.waveform,"#36d8ff"); };
+    row.append(n,a,b); wrap.appendChild(row);
+  });
 }
 
 function encodeWav(audioBuffer){
@@ -327,6 +421,12 @@ function wire(){
   wireDeckControls();
   wireTransitions();
   wireRecording();
+  buildHot("hotBtnsA",deckA);
+  buildHot("hotBtnsB",deckB);
+  renderSamplePads();
+  loadManifest().then(()=>{ initSamplesFromManifest(); renderLibrary(); });
+  $("scanAudio")?.addEventListener("click",()=>renderLibrary());
+  $("clearQueue")?.addEventListener("click",()=>{ const w=$("libList"); if(w) w.innerHTML=""; });
 }
 
 let last=performance.now();
