@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="MT logo">
+  <circle cx="512" cy="512" r="470" fill="#fff" stroke="#000" stroke-width="58"/>
+  <path d="M175 560l136-373h96l105 210 104-210h96l137 373h-92L793 309 624 640h-83L372 309 267 560z" fill="#000"/>
+  <path d="M333 593h358v120H537v269H488V713H333z" fill="#000"/>
+</svg>
