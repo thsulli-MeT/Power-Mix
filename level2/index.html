@@ -22,16 +22,6 @@
 
   <section class="top-controls card">
     <button id="enableAudio" class="btn led">Enable Audio</button>
-    <button id="runTransition" class="btn led">Auto Transition</button>
-
-    <div class="transition-wrap">
-      <label for="transitionStyle">Transition</label>
-      <select id="transitionStyle">
-        <option value="quick">Quick Cut</option>
-        <option value="smooth">Smooth Fade</option>
-        <option value="slow">Long Blend</option>
-      </select>
-    </div>
   </section>
 
   <section class="wavepanel card">
@@ -59,15 +49,32 @@
         </div>
       </div>
       <div class="meta">Track: <span id="trackAName">—</span></div>
-      <div class="channel-strip near-center">
-        <input id="volA" type="range" min="0" max="1" step="0.001" value="0.9" class="v-fader">
-        <div class="meter" id="meterA"></div>
-      </div>
     </section>
 
     <section class="center card">
       <div class="mixer-label">MASTER MIXER</div>
+      <div class="transition-wrap in-center">
+        <label for="transitionStyle">Transition</label>
+        <select id="transitionStyle">
+          <option value="quick">Quick Cut</option>
+          <option value="smooth">Smooth Fade</option>
+          <option value="slow">Long Blend</option>
+        </select>
+        <button id="runTransition" class="btn led">Run</button>
+      </div>
       <div class="center-row">
+        <div class="channel-strip center-faders">
+          <div class="fader-col">
+            <div class="fader-label">A VOL</div>
+            <input id="volA" type="range" min="0" max="1" step="0.001" value="0.9" class="v-fader">
+            <div class="meter" id="meterA"></div>
+          </div>
+          <div class="fader-col">
+            <div class="fader-label">B VOL</div>
+            <input id="volB" type="range" min="0" max="1" step="0.001" value="0.9" class="v-fader">
+            <div class="meter" id="meterB"></div>
+          </div>
+        </div>
         <div class="master-meter" id="meterMaster"></div>
         <div class="cross-wrap">
           <div id="crossTrack" class="cross-track" aria-label="Crossfader" role="slider" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0.5" tabindex="0">
@@ -110,10 +117,6 @@
         </div>
       </div>
       <div class="meta">Track: <span id="trackBName">—</span></div>
-      <div class="channel-strip near-center">
-        <div class="meter" id="meterB"></div>
-        <input id="volB" type="range" min="0" max="1" step="0.001" value="0.9" class="v-fader">
-      </div>
     </section>
   </main>
 

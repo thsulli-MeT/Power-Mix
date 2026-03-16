@@ -36,6 +36,15 @@ function drawWave(canvas, data, color){
   ctx.stroke();
 }
 
+
+function resolveMediaUrl(url){
+  if(!url) return "";
+  if(/^https?:\/\//i.test(url)) return url;
+  if(url.startsWith("../") || url.startsWith("/")) return url;
+  if(url.startsWith("audio/")) return "../"+url;
+  return "../audio/"+url;
+}
+
 function estimateRms(analyser){
   if(!analyser) return 0;
   const arr=new Float32Array(analyser.fftSize);
@@ -236,9 +245,10 @@ async function loadManifest(){
 
 async function loadSampleFromUrl(slot,url,name){
   if(!audioCtx) return;
-  const res=await fetch(encodeURI(url),{cache:"no-store"}); if(!res.ok) return;
+  const srcUrl=resolveMediaUrl(url);
+  const res=await fetch(encodeURI(srcUrl),{cache:"no-store"}); if(!res.ok) return;
   const ab=await res.arrayBuffer(); const decoded=await audioCtx.decodeAudioData(ab.slice(0));
-  sampleBank[slot]={name:name||url.split("/").pop(), buffer:decoded, url};
+  sampleBank[slot]={name:name||url.split("/").pop(), buffer:decoded, url:srcUrl};
   renderSamplePads();
 }
 
@@ -257,7 +267,7 @@ async function initSamplesFromManifest(){
 async function scanAudio(){
   if(!manifest) await loadManifest();
   if(manifest?.library?.length){
-    return manifest.library.map(it=>({name:it.title||it.name||it.file||it.path, url:it.path||it.file}));
+    return manifest.library.map(it=>({name:it.title||it.name||it.file||it.path, url:resolveMediaUrl(it.path||it.file)}));
   }
   return [];
 }
@@ -270,8 +280,8 @@ async function renderLibrary(){
     const n=document.createElement("div"); n.className="lib-name"; n.textContent=it.name;
     const a=document.createElement("button"); a.className="small-btn"; a.textContent="Load A";
     const b=document.createElement("button"); b.className="small-btn"; b.textContent="Load B";
-    a.onclick=async ()=>{ if(!unlocked) await enableAudio(); const res=await fetch(encodeURI(it.url)); const ab=await res.arrayBuffer(); const dec=await audioCtx.decodeAudioData(ab.slice(0)); deckA.duration=dec.duration||0; const ch=dec.getChannelData(0); deckA.waveform=ch.slice(0,Math.min(ch.length,1200*600)); deckA.scratchBuffer=dec; deckA.scratchBufferRev=reverseBuffer(dec); deckA.audio.src=encodeURI(it.url); $("trackAName").textContent=it.name; drawWave($("waveA"),deckA.waveform,"#ff5f6d"); };
-    b.onclick=async ()=>{ if(!unlocked) await enableAudio(); const res=await fetch(encodeURI(it.url)); const ab=await res.arrayBuffer(); const dec=await audioCtx.decodeAudioData(ab.slice(0)); deckB.duration=dec.duration||0; const ch=dec.getChannelData(0); deckB.waveform=ch.slice(0,Math.min(ch.length,1200*600)); deckB.scratchBuffer=dec; deckB.scratchBufferRev=reverseBuffer(dec); deckB.audio.src=encodeURI(it.url); $("trackBName").textContent=it.name; drawWave($("waveB"),deckB.waveform,"#36d8ff"); };
+    a.onclick=async ()=>{ if(!unlocked) await enableAudio(); const src=encodeURI(it.url); const res=await fetch(src); const ab=await res.arrayBuffer(); const dec=await audioCtx.decodeAudioData(ab.slice(0)); deckA.duration=dec.duration||0; const ch=dec.getChannelData(0); deckA.waveform=ch.slice(0,Math.min(ch.length,1200*600)); deckA.scratchBuffer=dec; deckA.scratchBufferRev=reverseBuffer(dec); deckA.audio.src=src; deckA.audio.load(); $("trackAName").textContent=it.name; drawWave($("waveA"),deckA.waveform,"#ff5f6d"); };
+    b.onclick=async ()=>{ if(!unlocked) await enableAudio(); const src=encodeURI(it.url); const res=await fetch(src); const ab=await res.arrayBuffer(); const dec=await audioCtx.decodeAudioData(ab.slice(0)); deckB.duration=dec.duration||0; const ch=dec.getChannelData(0); deckB.waveform=ch.slice(0,Math.min(ch.length,1200*600)); deckB.scratchBuffer=dec; deckB.scratchBufferRev=reverseBuffer(dec); deckB.audio.src=src; deckB.audio.load(); $("trackBName").textContent=it.name; drawWave($("waveB"),deckB.waveform,"#36d8ff"); };
     row.append(n,a,b); wrap.appendChild(row);
   });
 }
