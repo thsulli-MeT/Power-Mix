@@ -312,6 +312,11 @@ function buildSamplePad(i){
   const label=(sampleBank[i]?.name||`PAD ${i+1}`).replace(/\.(wav|mp3)$/i,"");
   b.textContent=label.length>10?label.slice(0,10)+"…":label;
   b.addEventListener("click", async (e)=>{
+    if(e.altKey){
+      if(!unlocked) await enableAudio();
+      await pickSampleFromLibrary(i);
+      return;
+    }
     if(e.shiftKey){
       const input=document.createElement("input"); input.type="file"; input.accept=".wav,.mp3,audio/*";
       input.onchange=async ()=>{ const file=input.files&&input.files[0]; if(!file) return; if(!unlocked) await enableAudio(); const ab=await file.arrayBuffer(); const decoded=await audioCtx.decodeAudioData(ab.slice(0)); sampleBank[i]={name:file.name, buffer:decoded}; renderSamplePads(); };
@@ -377,6 +382,28 @@ async function scanAudio(){
     return manifest.tracks.map(it=>({name:it.title||it.name||it.file||it.path, url:resolveMediaUrl(it.file||it.path)}));
   }
   return [];
+}
+
+
+
+async function pickSampleFromLibrary(slot){
+  if(!manifest) await loadManifest();
+  const fromSamples = (Array.isArray(manifest?.samples) ? manifest.samples : []).map((it)=>({
+    name: it.name || it.title || it.file || it.path,
+    url: resolveMediaUrl(it.path || it.file)
+  }));
+  const fromLibrary = (Array.isArray(manifest?.library) ? manifest.library : []).map((it)=>({
+    name: it.title || it.name || it.file || it.path,
+    url: resolveMediaUrl(it.path || it.file)
+  }));
+  const items = [...fromSamples, ...fromLibrary].filter(x=>x.url);
+  if(!items.length) return;
+  const menu = items.slice(0, 40).map((x,i)=>`${i+1}. ${x.name}`).join("\n");
+  const pick = prompt(`Pick sample for PAD ${slot+1} (1-${Math.min(40,items.length)}):\n${menu}`, "1");
+  if(!pick) return;
+  const idx = Math.max(1, Math.min(Math.min(40,items.length), Number(pick)||1)) - 1;
+  const chosen = items[idx];
+  await loadSampleFromUrl(slot, chosen.url, chosen.name);
 }
 
 async function renderLibrary(){
@@ -511,16 +538,18 @@ function wireDeckControls(){
   wireScratch("platterA",deckA); wireScratch("platterB",deckB);
 }
 
+function triggerTransition(){
+  const style=$("transitionStyle").value;
+  const dur=style==="quick"?550:style==="smooth"?1300:2400;
+  const from=crossValue, to=from<0.5?1:0;
+  const start=performance.now();
+  const ease=(t)=> style==="quick" ? (t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2) : (style==="smooth"? t : t*t*(3-2*t));
+  const step=(now)=>{ const t=Math.min(1,(now-start)/dur); setCross(from+(to-from)*ease(t)); if(t<1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+
 function wireTransitions(){
-  $("runTransition").addEventListener("click",()=>{
-    const style=$("transitionStyle").value;
-    const dur=style==="quick"?550:style==="smooth"?1300:2400;
-    const from=crossValue, to=from<0.5?1:0;
-    const start=performance.now();
-    const ease=(t)=> style==="quick" ? (t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2) : (style==="smooth"? t : t*t*(3-2*t));
-    const step=(now)=>{ const t=Math.min(1,(now-start)/dur); setCross(from+(to-from)*ease(t)); if(t<1) requestAnimationFrame(step); };
-    requestAnimationFrame(step);
-  });
+  $("runTransition").addEventListener("click", triggerTransition);
 }
 
 function buildMeter(container,count){ container.innerHTML=""; const cells=[]; for(let i=0;i<count;i++){ const d=document.createElement("div"); d.className="led-cell"; container.appendChild(d); cells.push(d); } return cells; }
@@ -579,7 +608,7 @@ function wire(){
   loadManifest().then(()=>{ initSamplesFromManifest(); renderLibrary(); });
   $("scanAudio")?.addEventListener("click",()=>renderLibrary());
   $("clearQueue")?.addEventListener("click",()=>{ const w=$("libList"); if(w) w.innerHTML=""; });
-  document.addEventListener("keydown", (e)=>{ const k=(e.key||"").toLowerCase(); if(["a","s","q","w","1","2","3","4"].includes(k)){ keysDown.add(k); if(!keyDownAt[k]) keyDownAt[k]=performance.now(); e.preventDefault(); }});
+  document.addEventListener("keydown", (e)=>{ const k=(e.key||"").toLowerCase(); if(["a","s","q","w","r","1","2","3","4"].includes(k)){ if(k==="r" && !e.repeat) triggerTransition(); keysDown.add(k); if(!keyDownAt[k]) keyDownAt[k]=performance.now(); e.preventDefault(); }});
   document.addEventListener("keyup", (e)=>{ const k=(e.key||"").toLowerCase(); keysDown.delete(k); delete keyDownAt[k]; });
 }
 
