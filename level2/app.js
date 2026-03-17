@@ -291,12 +291,17 @@ async function loadSampleFromUrl(slot,url,name){
 
 async function initSamplesFromManifest(){
   if(!manifest) return;
-  const s=Array.isArray(manifest.samples)?manifest.samples:[];
-  for(let i=0;i<8;i++){
-    const p=s[i]?.path||s[i]?.file; if(!p) continue;
-    const n=s[i]?.name||s[i]?.title||p.split("/").pop();
-    sampleBank[i]={name:n, buffer:null, url:p};
-    if(unlocked) await loadSampleFromUrl(i,p,n);
+  const base=Array.isArray(manifest.samples)?manifest.samples:[];
+  const lib=Array.isArray(manifest.library)?manifest.library:[];
+  const merged=[...base];
+  for(let i=0;i<lib.length && merged.length<16;i++) merged.push(lib[i]);
+  for(let i=0;i<16;i++){
+    const it=merged[i];
+    const p=it?.path||it?.file; if(!p) continue;
+    const n=it?.name||it?.title||p.split("/").pop();
+    const url=resolveMediaUrl(p);
+    sampleBank[i]={name:n, buffer:null, url};
+    if(unlocked) await loadSampleFromUrl(i,url,n);
   }
   renderSamplePads();
 }
@@ -455,7 +460,7 @@ function wireTransitions(){
 }
 
 function buildMeter(container,count){ container.innerHTML=""; const cells=[]; for(let i=0;i<count;i++){ const d=document.createElement("div"); d.className="led-cell"; container.appendChild(d); cells.push(d); } return cells; }
-function paintMeter(cells,n){ const on=Math.round(n*cells.length); cells.forEach((c,i)=>{ c.classList.remove("on","warn","clip"); if(i>=cells.length-on){ const rank=(cells.length-1)-i; const hi=rank<2, mid=rank<5; c.classList.add(hi?"clip":mid?"warn":"on"); }}); }
+function paintMeter(cells,n){ const on=Math.round(n*cells.length); cells.forEach((c,i)=>{ c.classList.remove("on","warn","clip"); if(i>=cells.length-on){ if(i<2) c.classList.add("clip"); else if(i<5) c.classList.add("warn"); else c.classList.add("on"); }}); }
 
 function wireRecording(){
   $("recordBtn").addEventListener("click", async ()=>{ if(!unlocked) await enableAudio(); startRecording(); });
