@@ -215,28 +215,33 @@ function buildHot(containerId, deck){
   }
 }
 
+function buildSamplePad(i){
+  const b=document.createElement("button"); b.className="sample-pad"+(sampleVoices[i]?" latched":"");
+  const label=(sampleBank[i]?.name||`PAD ${i+1}`).replace(/\.(wav|mp3)$/i,"");
+  b.textContent=label.length>10?label.slice(0,10)+"…":label;
+  b.addEventListener("click", async (e)=>{
+    if(e.shiftKey){
+      const input=document.createElement("input"); input.type="file"; input.accept=".wav,.mp3,audio/*";
+      input.onchange=async ()=>{ const file=input.files&&input.files[0]; if(!file) return; if(!unlocked) await enableAudio(); const ab=await file.arrayBuffer(); const decoded=await audioCtx.decodeAudioData(ab.slice(0)); sampleBank[i]={name:file.name, buffer:decoded}; renderSamplePads(); };
+      input.click();
+      return;
+    }
+    if(!unlocked) await enableAudio();
+    const it=sampleBank[i]; if(!it?.buffer) return;
+    if(sampleVoices[i]){ try{ sampleVoices[i].stop(); }catch(_){ } sampleVoices[i]=null; renderSamplePads(); return; }
+    const src=audioCtx.createBufferSource(); src.buffer=it.buffer; src.loop=true; src.connect(masterGain); src.start(); sampleVoices[i]=src;
+    src.onended=()=>{ if(sampleVoices[i]===src) sampleVoices[i]=null; renderSamplePads(); };
+    renderSamplePads();
+  });
+  return b;
+}
+
 function renderSamplePads(){
-  const wrap=$("samplePads"); if(!wrap) return; wrap.innerHTML="";
-  for(let i=0;i<16;i++){
-    const b=document.createElement("button"); b.className="sample-pad"+(sampleVoices[i]?" latched":"");
-    const label=(sampleBank[i]?.name||`PAD ${i+1}`).replace(/\.(wav|mp3)$/i,"");
-    b.textContent=label.length>10?label.slice(0,10)+"…":label;
-    b.addEventListener("click", async (e)=>{
-      if(e.shiftKey){
-        const input=document.createElement("input"); input.type="file"; input.accept=".wav,.mp3,audio/*";
-        input.onchange=async ()=>{ const file=input.files&&input.files[0]; if(!file) return; if(!unlocked) await enableAudio(); const ab=await file.arrayBuffer(); const decoded=await audioCtx.decodeAudioData(ab.slice(0)); sampleBank[i]={name:file.name, buffer:decoded}; renderSamplePads(); };
-        input.click();
-        return;
-      }
-      if(!unlocked) await enableAudio();
-      const it=sampleBank[i]; if(!it?.buffer) return;
-      if(sampleVoices[i]){ try{ sampleVoices[i].stop(); }catch(_){ } sampleVoices[i]=null; renderSamplePads(); return; }
-      const src=audioCtx.createBufferSource(); src.buffer=it.buffer; src.loop=true; src.connect(masterGain); src.start(); sampleVoices[i]=src;
-      src.onended=()=>{ if(sampleVoices[i]===src) sampleVoices[i]=null; renderSamplePads(); };
-      renderSamplePads();
-    });
-    wrap.appendChild(b);
-  }
+  const wrapA=$("samplePadsA"), wrapB=$("samplePadsB");
+  if(!wrapA || !wrapB) return;
+  wrapA.innerHTML=""; wrapB.innerHTML="";
+  for(let i=0;i<8;i++) wrapA.appendChild(buildSamplePad(i));
+  for(let i=8;i<16;i++) wrapB.appendChild(buildSamplePad(i));
 }
 
 async function loadManifest(){
