@@ -6,7 +6,19 @@
   <title>sMV Power Mix — Level 2</title>
   <link rel="stylesheet" href="styles.css?v=2"/>
 </head>
-<body>
+<body class="level2-locked">
+  <section id="level2Gate" class="level2-gate" aria-live="polite">
+    <div class="level2-gate-card card">
+      <h1>Level 2 Access Code</h1>
+      <p>Enter your Level 2 member access code to unlock Power Mix.</p>
+      <div class="level2-gate-row">
+        <input id="level2CodeInput" class="scene-input" type="text" autocomplete="off" placeholder="Enter access code" aria-label="Level 2 access code"/>
+        <button id="level2CodeSubmit" class="btn">Unlock Level 2</button>
+      </div>
+      <div id="level2CodeMsg" class="level2-gate-msg"></div>
+      <a class="sample-tip" href="access-codes.json" target="_blank" rel="noopener">Code list file (for admin/GitHub updates)</a>
+    </div>
+  </section>
   <header class="sponsorbar">
     <a class="sponsor-box" href="https://smv-short-music-videos.printify.me/" target="_blank" rel="noopener" aria-label="SMV Merch Store">
       <img class="store-promo" src="../assets/smv-store-promo.svg" alt="SMV Store"/>

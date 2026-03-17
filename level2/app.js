@@ -10,6 +10,71 @@ let crossValue = 0.5;
 const keysDown = new Set();
 const keyDownAt = {};
 
+const LEVEL2_ACCESS_CODES_URL = "access-codes.json";
+const LEVEL2_ACCESS_STORE_KEY = "powermix_level2_access_code";
+const LEVEL2_DEFAULT_CODES = ["TryLevel2"];
+let level2Codes = [...LEVEL2_DEFAULT_CODES];
+let level2AccessGranted = false;
+
+function normalizeAccessCode(v){ return String(v||"").trim(); }
+
+async function loadLevel2AccessCodes(){
+  try{
+    const res=await fetch(LEVEL2_ACCESS_CODES_URL,{cache:"no-store"});
+    if(!res.ok) throw new Error("access-codes fetch failed");
+    const data=await res.json();
+    const raw=Array.isArray(data) ? data : (Array.isArray(data?.codes) ? data.codes : []);
+    const cleaned=raw.map((x)=>normalizeAccessCode(x)).filter(Boolean);
+    if(cleaned.length) level2Codes=cleaned;
+  }catch(_){
+    level2Codes=[...LEVEL2_DEFAULT_CODES];
+  }
+}
+
+function codeIsValid(code){
+  const c=normalizeAccessCode(code);
+  return Boolean(c && level2Codes.includes(c));
+}
+
+function unlockLevel2(code){
+  level2AccessGranted=true;
+  localStorage.setItem(LEVEL2_ACCESS_STORE_KEY, normalizeAccessCode(code));
+  document.body.classList.remove("level2-locked");
+  document.body.classList.add("level2-unlocked");
+}
+
+async function initAccessGate(){
+  const gate=$("level2Gate");
+  const input=$("level2CodeInput");
+  const btn=$("level2CodeSubmit");
+  const msg=$("level2CodeMsg");
+  if(!gate || !input || !btn || !msg){
+    level2AccessGranted=true;
+    return;
+  }
+
+  await loadLevel2AccessCodes();
+  const saved=normalizeAccessCode(localStorage.getItem(LEVEL2_ACCESS_STORE_KEY));
+  if(codeIsValid(saved)){
+    unlockLevel2(saved);
+    return;
+  }
+
+  const tryUnlock=()=>{
+    const entered=normalizeAccessCode(input.value);
+    if(codeIsValid(entered)){
+      msg.textContent="";
+      unlockLevel2(entered);
+      return;
+    }
+    msg.textContent='Get Patreon  level 2 member access codes at https://www.patreon.com/cw/shortmusicvideos';
+  };
+
+  btn.addEventListener("click", tryUnlock);
+  input.addEventListener("keydown", (e)=>{ if(e.key==="Enter") tryUnlock(); });
+  setTimeout(()=>input.focus(), 50);
+}
+
 function clamp01(v){ return Math.max(0, Math.min(1, v)); }
 function fmtTime(sec){ if(!isFinite(sec)||sec<0) return "0:00"; const m=Math.floor(sec/60), s=Math.floor(sec%60); return `${m}:${String(s).padStart(2,"0")}`; }
 
@@ -623,6 +688,7 @@ function stopRecording(){
 }
 
 async function enableAudio(){
+  if(!level2AccessGranted) return;
   if(unlocked) return;
   audioCtx=new (window.AudioContext||window.webkitAudioContext)();
   masterGain=audioCtx.createGain(); masterGain.gain.value=1;
@@ -802,4 +868,5 @@ function loop(now){
 }
 
 wire();
+initAccessGate();
 requestAnimationFrame(loop);
