@@ -21,9 +21,15 @@
 
   <section class="top-controls card">
     <button id="enableAudio" class="btn led">Enable Audio</button>
+    <div class="scene-tools">
+      <input id="sceneName" class="scene-input" type="text" value="show-1" aria-label="Scene name"/>
+      <button id="saveScene" class="btn">Save Scene</button>
+      <button id="loadScene" class="btn">Load Scene</button>
+    </div>
     <div class="top-notes">
       <div class="l2-chip">LEVEL 2</div>
       <div class="sample-tip">Tip: Shift+Click a sample pad to load a local .wav/.mp3 file.</div>
+      <div class="sample-tip">Save Scene downloads a .power-mix-settings file with your setup. Loading it later restores your show quickly.</div>
       <div class="sample-tip">Keys: A/S hard cut crossfader • Q/W fade to A/B (hold = faster) • R run auto transition • 1/2 lower/raise A volume • 3/4 lower/raise B volume. Alt+Click sample pad opens sample library picker.</div>
     </div>
   </section>

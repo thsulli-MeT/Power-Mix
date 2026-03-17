@@ -15,8 +15,10 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:radial-gradient(
 .logo-img{width:min(520px,45vw)}
 .l2-badge{position:absolute;right:10px;bottom:4px;background:#111;padding:4px 10px;border-radius:999px;border:1px solid #4bc2ff;font-weight:700}
 
-.top-controls{display:flex;gap:12px;align-items:center;padding:12px;margin-bottom:12px}
-.top-notes{display:grid;gap:4px}
+.top-controls{display:flex;gap:12px;align-items:center;padding:12px;margin-bottom:12px;flex-wrap:wrap}
+.scene-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.scene-input{height:40px;min-width:110px;max-width:160px;border-radius:10px;border:1px solid var(--stroke);background:#0f1423;color:#fff;padding:0 10px;font-weight:700}
+.top-notes{display:grid;gap:4px;min-width:min(100%,420px)}
 .l2-chip{display:inline-flex;align-items:center;justify-content:center;padding:4px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.45);font-weight:900;letter-spacing:.08em;background:rgba(255,255,255,.08)}
 .sample-tip{font-size:12px;opacity:.88}
 .transition-wrap{display:flex;align-items:center;gap:8px}

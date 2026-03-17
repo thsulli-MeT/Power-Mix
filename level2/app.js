@@ -95,6 +95,9 @@ class Deck{
     this.cuePoint=0;
     this.hot=Array(8).fill(null);
     this.activeFxSlot = null;
+    this.sourceUrl = null;
+    this.sourceName = "—";
+    this.sourceType = "none";
   }
 
   connect(){
@@ -134,6 +137,9 @@ class Deck{
     this.cuePoint=0;
     this.hot=Array(8).fill(null);
     this.activeFxSlot = null;
+    this.sourceUrl = null;
+    this.sourceName = file.name;
+    this.sourceType = "local";
   }
 
   tick(dt){
@@ -234,6 +240,7 @@ const deckB=new Deck("B");
 
 const sampleBank=Array(16).fill(null);
 const sampleVoices=Array(16).fill(null);
+const defaultSampleAssignments=Array(16).fill(null);
 let manifest=null;
 
 function playScratchGrain(deck,tSec,dir){
@@ -368,6 +375,7 @@ async function initSamplesFromManifest(){
     const n=it?.name||it?.title||p.split("/").pop();
     const url=resolveMediaUrl(p);
     sampleBank[i]={name:n, buffer:null, url};
+    defaultSampleAssignments[i]={name:n, url};
     if(unlocked) await loadSampleFromUrl(i,url,n);
   }
   renderSamplePads();
@@ -406,6 +414,134 @@ async function pickSampleFromLibrary(slot){
   await loadSampleFromUrl(slot, chosen.url, chosen.name);
 }
 
+function safeName(v, fallback){
+  const t=String(v||"" ).trim();
+  return t || fallback;
+}
+
+async function loadDeckFromUrl(deck,url,name,nameId,waveId){
+  if(!unlocked) await enableAudio();
+  const src=encodeURI(url);
+  const res=await fetch(src,{cache:"no-store"});
+  if(!res.ok) throw new Error(`Failed to load ${src}`);
+  const ab=await res.arrayBuffer();
+  const dec=await audioCtx.decodeAudioData(ab.slice(0));
+  deck.duration=dec.duration||0;
+  const ch=dec.getChannelData(0);
+  deck.waveform=ch.slice(0,Math.min(ch.length,1200*600));
+  deck.scratchBuffer=dec;
+  deck.scratchBufferRev=reverseBuffer(dec);
+  deck.audio.src=src;
+  deck.audio.load();
+  deck.sourceUrl=url;
+  deck.sourceName=name||url.split("/").pop()||"—";
+  deck.sourceType="url";
+  $(nameId).textContent=deck.sourceName;
+  drawWave($(waveId),deck.waveform,waveId==="waveA"?"#ff5f6d":"#36d8ff");
+}
+
+function clearDeck(deck,nameId,waveId,playBtnId){
+  try{ deck.audio.pause(); }catch(_){ }
+  deck.audio.removeAttribute("src");
+  deck.audio.load();
+  deck.duration=0;
+  deck.waveform=null;
+  deck.scratchBuffer=null;
+  deck.scratchBufferRev=null;
+  deck.sourceUrl=null;
+  deck.sourceName="—";
+  deck.sourceType="none";
+  $(nameId).textContent="—";
+  drawWave($(waveId),null,waveId==="waveA"?"#ff5f6d":"#36d8ff");
+  $(playBtnId).classList.remove("engaged");
+}
+
+function downloadText(filename, text){
+  const blob=new Blob([text],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=filename;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),500);
+}
+
+function captureScene(){
+  return {
+    version: 1,
+    createdAt: new Date().toISOString(),
+    sceneName: safeName($("sceneName")?.value, "show-1"),
+    transitionStyle: $("transitionStyle")?.value || "quick",
+    crossValue,
+    volA: Number($("volA")?.value || 0.9),
+    volB: Number($("volB")?.value || 0.9),
+    fxSlots: { A:[...fxSlots.A], B:[...fxSlots.B] },
+    decks: {
+      A:{ sourceType:deckA.sourceType, sourceUrl:deckA.sourceUrl, sourceName:deckA.sourceName, cuePoint:deckA.cuePoint, hot:[...deckA.hot] },
+      B:{ sourceType:deckB.sourceType, sourceUrl:deckB.sourceUrl, sourceName:deckB.sourceName, cuePoint:deckB.cuePoint, hot:[...deckB.hot] }
+    },
+    samples: sampleBank.map((it,idx)=>({
+      name: it?.name || null,
+      url: (it?.url && !String(it.url).startsWith("blob:")) ? it.url : null,
+      hadLocalFile: Boolean(it && !it.url),
+      fallback: defaultSampleAssignments[idx] ? { ...defaultSampleAssignments[idx] } : null
+    }))
+  };
+}
+
+async function restoreSampleSlot(slot,spec){
+  try{
+    if(spec?.url){
+      await loadSampleFromUrl(slot,spec.url,spec.name||`PAD ${slot+1}`);
+      return;
+    }
+  }catch(_){ }
+  const fallback = spec?.fallback || defaultSampleAssignments[slot];
+  if(fallback?.url){
+    try{
+      await loadSampleFromUrl(slot,fallback.url,fallback.name||`PAD ${slot+1}`);
+      return;
+    }catch(_){ }
+  }
+  sampleBank[slot]=null;
+}
+
+async function applyScene(scene){
+  if(!scene || typeof scene!=="object") throw new Error("Invalid scene file");
+  if(!unlocked) await enableAudio();
+
+  if($("sceneName")) $("sceneName").value=safeName(scene.sceneName, "show-1");
+  if($("transitionStyle") && scene.transitionStyle) $("transitionStyle").value=scene.transitionStyle;
+  if($("volA")) $("volA").value=String(clamp01(Number(scene.volA ?? 0.9)));
+  if($("volB")) $("volB").value=String(clamp01(Number(scene.volB ?? 0.9)));
+  setCross(clamp01(Number(scene.crossValue ?? 0.5)));
+
+  if(scene.fxSlots?.A?.length===8) fxSlots.A = scene.fxSlots.A.map((n)=>Math.max(0,Math.min(15,Number(n)||0)));
+  if(scene.fxSlots?.B?.length===8) fxSlots.B = scene.fxSlots.B.map((n)=>Math.max(0,Math.min(15,Number(n)||0)));
+  buildFx("fxBtnsA",deckA,"A");
+  buildFx("fxBtnsB",deckB,"B");
+
+  const dA=scene.decks?.A || {};
+  const dB=scene.decks?.B || {};
+
+  if(dA.sourceUrl){ try{ await loadDeckFromUrl(deckA,dA.sourceUrl,dA.sourceName,"trackAName","waveA"); }catch(_){ clearDeck(deckA,"trackAName","waveA","playA"); } }
+  else clearDeck(deckA,"trackAName","waveA","playA");
+  if(dB.sourceUrl){ try{ await loadDeckFromUrl(deckB,dB.sourceUrl,dB.sourceName,"trackBName","waveB"); }catch(_){ clearDeck(deckB,"trackBName","waveB","playB"); } }
+  else clearDeck(deckB,"trackBName","waveB","playB");
+
+  deckA.cuePoint=Math.max(0,Number(dA.cuePoint||0));
+  deckB.cuePoint=Math.max(0,Number(dB.cuePoint||0));
+  deckA.hot=Array.isArray(dA.hot)&&dA.hot.length===8?dA.hot.map((x)=>x==null?null:Math.max(0,Number(x)||0)):Array(8).fill(null);
+  deckB.hot=Array.isArray(dB.hot)&&dB.hot.length===8?dB.hot.map((x)=>x==null?null:Math.max(0,Number(x)||0)):Array(8).fill(null);
+  buildHot("hotBtnsA",deckA);
+  buildHot("hotBtnsB",deckB);
+
+  for(let i=0;i<16;i++){
+    if(sampleVoices[i]){ try{ sampleVoices[i].stop(); }catch(_){ } sampleVoices[i]=null; }
+    await restoreSampleSlot(i, scene.samples?.[i] || null);
+  }
+  renderSamplePads();
+}
+
 async function renderLibrary(){
   const wrap=$("libList"); if(!wrap) return; wrap.innerHTML="";
   const items=await scanAudio();
@@ -414,8 +550,8 @@ async function renderLibrary(){
     const n=document.createElement("div"); n.className="lib-name"; n.textContent=it.name;
     const a=document.createElement("button"); a.className="small-btn"; a.textContent="Load A";
     const b=document.createElement("button"); b.className="small-btn"; b.textContent="Load B";
-    a.onclick=async ()=>{ if(!unlocked) await enableAudio(); const src=encodeURI(it.url); const res=await fetch(src); const ab=await res.arrayBuffer(); const dec=await audioCtx.decodeAudioData(ab.slice(0)); deckA.duration=dec.duration||0; const ch=dec.getChannelData(0); deckA.waveform=ch.slice(0,Math.min(ch.length,1200*600)); deckA.scratchBuffer=dec; deckA.scratchBufferRev=reverseBuffer(dec); deckA.audio.src=src; deckA.audio.load(); $("trackAName").textContent=it.name; drawWave($("waveA"),deckA.waveform,"#ff5f6d"); };
-    b.onclick=async ()=>{ if(!unlocked) await enableAudio(); const src=encodeURI(it.url); const res=await fetch(src); const ab=await res.arrayBuffer(); const dec=await audioCtx.decodeAudioData(ab.slice(0)); deckB.duration=dec.duration||0; const ch=dec.getChannelData(0); deckB.waveform=ch.slice(0,Math.min(ch.length,1200*600)); deckB.scratchBuffer=dec; deckB.scratchBufferRev=reverseBuffer(dec); deckB.audio.src=src; deckB.audio.load(); $("trackBName").textContent=it.name; drawWave($("waveB"),deckB.waveform,"#36d8ff"); };
+    a.onclick=async ()=>{ await loadDeckFromUrl(deckA,it.url,it.name,"trackAName","waveA"); };
+    b.onclick=async ()=>{ await loadDeckFromUrl(deckB,it.url,it.name,"trackBName","waveB"); };
     row.append(n,a,b); wrap.appendChild(row);
   });
 }
@@ -608,6 +744,28 @@ function wire(){
   loadManifest().then(()=>{ initSamplesFromManifest(); renderLibrary(); });
   $("scanAudio")?.addEventListener("click",()=>renderLibrary());
   $("clearQueue")?.addEventListener("click",()=>{ const w=$("libList"); if(w) w.innerHTML=""; });
+  $("saveScene")?.addEventListener("click", ()=>{
+    const scene=captureScene();
+    const clean=safeName(scene.sceneName,"show-1").replace(/[^a-z0-9_-]+/gi,"-").replace(/^-+|-+$/g,"") || "show-1";
+    downloadText(`${clean}.power-mix-settings`, JSON.stringify(scene,null,2));
+  });
+  $("loadScene")?.addEventListener("click", ()=>{
+    const input=document.createElement("input");
+    input.type="file";
+    input.accept=".power-mix-settings,.json,application/json";
+    input.onchange=async ()=>{
+      const file=input.files && input.files[0];
+      if(!file) return;
+      try{
+        const text=await file.text();
+        const scene=JSON.parse(text);
+        await applyScene(scene);
+      }catch(err){
+        alert("Could not load settings file. Please use a valid .power-mix-settings file.");
+      }
+    };
+    input.click();
+  });
   document.addEventListener("keydown", (e)=>{ const k=(e.key||"").toLowerCase(); if(["a","s","q","w","r","1","2","3","4"].includes(k)){ if(k==="r" && !e.repeat) triggerTransition(); keysDown.add(k); if(!keyDownAt[k]) keyDownAt[k]=performance.now(); e.preventDefault(); }});
   document.addEventListener("keyup", (e)=>{ const k=(e.key||"").toLowerCase(); keysDown.delete(k); delete keyDownAt[k]; });
 }
