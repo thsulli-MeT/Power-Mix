@@ -150,21 +150,70 @@ function makeImpulse(seconds, decay){
   return buf;
 }
 
-const PRESETS=[
+const EFFECT_LIBRARY=[
   {label:"AIR",f:.85,e:0,r:0},{label:"SUB",f:.18,e:0,r:0},{label:"ECHO",f:.55,e:.62,r:0},{label:"HALL",f:.70,e:0,r:.62},
-  {label:"SWEEP",f:.92,e:.2,r:.05},{label:"WARM",f:.62,e:0,r:.18},{label:"SPACE",f:.72,e:.25,r:.72},{label:"CUT",f:.1,e:0,r:0}
+  {label:"SWEEP",f:.92,e:.2,r:.05},{label:"WARM",f:.62,e:0,r:.18},{label:"SPACE",f:.72,e:.25,r:.72},{label:"CUT",f:.1,e:0,r:0},
+  {label:"FLANGE",f:.66,e:.46,r:.05},{label:"DUB",f:.42,e:.82,r:.12},{label:"VINYL",f:.36,e:.08,r:0},
+  {label:"PHONE",f:.22,e:.0,r:.0},{label:"GATE",f:.12,e:.18,r:0},{label:"GLASS",f:.9,e:.12,r:.36},
+  {label:"MIST",f:.76,e:.14,r:.52},{label:"RAVE",f:.58,e:.52,r:.3}
 ];
 
-function buildFx(containerId, deck){
+const fxSlots = { A:[0,1,2,3,4,5,6,7], B:[8,9,10,11,12,13,14,15] };
+
+function applyEffect(deck, fx, amt){
+  deck.setFilterNorm(1 - (1 - fx.f) * amt);
+  deck.setEchoWet((fx.e||0) * amt);
+  deck.setReverbWet((fx.r||0) * amt);
+}
+
+function buildFx(containerId, deck, side){
   const wrap=$(containerId); wrap.innerHTML="";
-  PRESETS.forEach((p)=>{
-    const b=document.createElement("button"); b.className="fxbtn"; b.textContent=p.label;
-    b.addEventListener("click", ()=>{
-      const was=b.classList.contains("on");
+  const slots = fxSlots[side];
+  slots.forEach((fxIdx, slotIdx)=>{
+    const b=document.createElement("button");
+    b.className="fxbtn";
+    b.dataset.slot=String(slotIdx);
+
+    const setLabel=()=>{ b.textContent = EFFECT_LIBRARY[slots[slotIdx]].label; };
+    setLabel();
+
+    let dragging=false, startY=0, moved=0;
+
+    b.addEventListener("pointerdown", (e)=>{
+      if(e.altKey) return;
+      dragging=true; moved=0; startY=e.clientY;
+      b.setPointerCapture(e.pointerId);
       wrap.querySelectorAll(".fxbtn").forEach(x=>x.classList.remove("on"));
-      if(was){ deck.setFilterNorm(1); deck.setEchoWet(0); deck.setReverbWet(0); return; }
-      b.classList.add("on"); deck.setFilterNorm(p.f); deck.setEchoWet(p.e); deck.setReverbWet(p.r);
+      b.classList.add("on");
+      applyEffect(deck, EFFECT_LIBRARY[slots[slotIdx]], 0.2);
     });
+    b.addEventListener("pointermove", (e)=>{
+      if(!dragging) return;
+      moved = Math.max(moved, Math.abs(e.clientY-startY));
+      const amt = clamp01((startY - e.clientY) / 110);
+      applyEffect(deck, EFFECT_LIBRARY[slots[slotIdx]], Math.max(0.05, amt));
+    });
+    b.addEventListener("pointerup", ()=>{
+      if(!dragging) return;
+      dragging=false;
+      if(moved < 6) applyEffect(deck, EFFECT_LIBRARY[slots[slotIdx]], 1.0);
+    });
+
+    b.addEventListener("click", (e)=>{
+      if(e.altKey){
+        const menu = EFFECT_LIBRARY.map((x,i)=>`${i+1}. ${x.label}`).join("\n");
+        const pick = prompt(`Assign effect to this button (1-16):\n${menu}`, String(slots[slotIdx]+1));
+        if(!pick) return;
+        const idx = Math.max(1, Math.min(16, Number(pick)||1)) - 1;
+        slots[slotIdx] = idx;
+        setLabel();
+        return;
+      }
+      wrap.querySelectorAll(".fxbtn").forEach(x=>x.classList.remove("on"));
+      b.classList.add("on");
+      applyEffect(deck, EFFECT_LIBRARY[slots[slotIdx]], 1.0);
+    });
+
     wrap.appendChild(b);
   });
 }
@@ -259,9 +308,11 @@ function buildSamplePad(i){
       return;
     }
     if(!unlocked) await enableAudio();
-    const it=sampleBank[i]; if(!it?.buffer) return;
+    const it=sampleBank[i];
+    if(!it?.buffer && it?.url) await loadSampleFromUrl(i, it.url, it.name);
+    if(!sampleBank[i]?.buffer) return;
     if(sampleVoices[i]){ try{ sampleVoices[i].stop(); }catch(_){ } sampleVoices[i]=null; renderSamplePads(); return; }
-    const src=audioCtx.createBufferSource(); src.buffer=it.buffer; src.loop=true; src.connect(masterGain); src.start(); sampleVoices[i]=src;
+    const src=audioCtx.createBufferSource(); src.buffer=sampleBank[i].buffer; src.loop=true; src.connect(masterGain); src.start(); sampleVoices[i]=src;
     src.onended=()=>{ if(sampleVoices[i]===src) sampleVoices[i]=null; renderSamplePads(); };
     renderSamplePads();
   });
@@ -394,7 +445,9 @@ async function enableAudio(){
   recordDest=audioCtx.createMediaStreamDestination();
   masterGain.connect(masterAnalyser); masterAnalyser.connect(audioCtx.destination); masterGain.connect(recordDest);
   deckA.connect(); deckB.connect();
-  buildFx("fxBtnsA",deckA); buildFx("fxBtnsB",deckB);
+  buildFx("fxBtnsA",deckA,"A"); buildFx("fxBtnsB",deckB,"B");
+  if(!manifest) await loadManifest();
+  await initSamplesFromManifest();
   unlocked=true; $("enableAudio").classList.add("engaged"); $("enableAudio").textContent="Audio Ready";
 }
 

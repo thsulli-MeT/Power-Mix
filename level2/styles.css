@@ -42,7 +42,7 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:radial-gradient(
 .deck-controls{display:flex;gap:8px;flex-wrap:wrap}
 .fx-title{font-weight:700;opacity:.86;font-size:13px}
 .fx-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
-.fxbtn{border:1px solid rgba(255,255,255,.35);background:linear-gradient(180deg,#63666f,#3f424a 55%, #2c2f35);color:#f1f3f8;padding:8px 6px;border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 3px 8px rgba(0,0,0,.35)}
+.fxbtn{border:1px solid rgba(255,255,255,.35);background:linear-gradient(180deg,#63666f,#3f424a 55%, #2c2f35);color:#f1f3f8;min-height:72px;padding:10px 8px;border-radius:12px;font-size:11px;font-weight:800;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 3px 8px rgba(0,0,0,.35);touch-action:none;user-select:none}
 .fxbtn.on{outline:2px solid rgba(255,255,255,.92);box-shadow:0 0 16px rgba(255,255,255,.7), inset 0 1px 0 rgba(255,255,255,.35)}
 
 .platter-wrap{display:flex;justify-content:center;padding:4px}
@@ -145,3 +145,5 @@ box-shadow:inset 0 0 0 2px rgba(255,255,255,.15),0 20px 45px rgba(0,0,0,.5);posi
 .btn.engaged{outline:2px solid rgba(255,255,255,.92);box-shadow:0 0 16px rgba(255,255,255,.65), inset 0 0 10px rgba(255,255,255,.2)}
 .hot-btn.is-set{outline:2px solid rgba(255,255,255,.92);box-shadow:0 0 12px rgba(255,255,255,.55)}
 .sample-pad.latched{outline:3px solid rgba(255,255,255,.92);box-shadow:0 0 18px rgba(255,255,255,.6), inset 0 1px 0 rgba(255,255,255,.35)}
+
+.fxbtn:active{transform:translateY(1px)}
