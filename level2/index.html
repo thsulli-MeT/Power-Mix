@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>sMV Power Mix — Level 2</title>
+  <link rel="stylesheet" href="styles.css?v=2"/>
+</head>
+<body>
+  <header class="sponsorbar">
+    <a class="sponsor-box" href="https://smv-short-music-videos.printify.me/" target="_blank" rel="noopener" aria-label="SMV Merch Store">
+      <img class="store-promo" src="../assets/smv-store-promo.svg" alt="SMV Store"/>
+    </a>
+    <div class="logo-wrap">
+      <img src="../assets/power-mix-logo.png" alt="sMV Power Mix" class="logo-img" />
+    </div>
+    <a class="sponsor-box" href="https://shortmusicvideos.com" target="_blank" rel="noopener">
+      <img class="smv-banner-logo" src="../assets/SMVBW.png" alt="SMV" />
+    </a>
+  </header>
+
+  <section class="top-controls card">
+    <button id="enableAudio" class="btn led">Enable Audio</button>
+    <div class="scene-tools">
+      <input id="sceneName" class="scene-input" type="text" value="show-1" aria-label="Scene name"/>
+      <button id="saveScene" class="btn">Save Scene</button>
+      <button id="loadScene" class="btn">Load Scene</button>
+    </div>
+    <div class="top-notes">
+      <div class="l2-chip">LEVEL 2</div>
+      <div class="sample-tip">Tip: Shift+Click a sample pad to load a local .wav/.mp3 file.</div>
+      <div class="sample-tip">Save Scene downloads a .power-mix-settings file with your setup. Loading it later restores your show quickly.</div>
+      <div class="sample-tip">Keys: A/S hard cut crossfader • Q/W fade to A/B (hold = faster) • R run auto transition • 1/2 lower/raise A volume • 3/4 lower/raise B volume. Alt+Click sample pad opens sample library picker.</div>
+    </div>
+  </section>
+
+  <section class="wavepanel card">
+    <canvas id="waveA" class="wave-canvas" width="1400" height="90"></canvas>
+    <canvas id="waveB" class="wave-canvas" width="1400" height="90"></canvas>
+  </section>
+
+  <main class="mixer-grid">
+    <section class="deck card deck-a">
+      <div class="deck-head">DECK A <span id="timeA">0:00 / 0:00</span></div>
+      <div class="deck-controls">
+        <button id="loadLocalA" class="btn">Load A</button>
+        <button id="playA" class="btn led">Play</button>
+        <button id="stopA" class="btn led stop">Stop</button>
+        <button id="cueA" class="btn">Cue</button>
+      </div>
+
+      <div class="fx-title">Effects</div>
+      <div id="fxBtnsA" class="fx-grid"></div>
+      <div class="hs-title">Hot Spots</div>
+      <div id="hotBtnsA" class="hot-grid"></div>
+
+      <div class="platter-wrap">
+        <div class="platter-disc" id="platterA">
+          <div class="platter-core"><img src="../assets/mt-logo.svg" class="platter-logo" alt="MT logo"></div>
+        </div>
+      </div>
+      <div class="meta">Track: <span id="trackAName">—</span></div>
+
+      <div class="samples-block deck-samples">
+        <div class="blk-title">Deck A Samples (1-8)</div>
+        <div id="samplePadsA" class="sample-grid deck"></div>
+      </div>
+    </section>
+
+    <section class="center card">
+      <div class="transition-wrap in-center">
+        <label for="transitionStyle">Transition</label>
+        <select id="transitionStyle">
+          <option value="quick">Quick Cut</option>
+          <option value="smooth">Smooth Fade</option>
+          <option value="slow">Long Blend</option>
+        </select>
+        <button id="runTransition" class="btn led">Run</button>
+      </div>
+
+      <div class="mixer-top">
+        <div class="fader-col">
+          <div class="fader-label">A</div>
+          <input id="volA" type="range" min="0" max="1" step="0.001" value="0.9" class="v-fader">
+        </div>
+        <div class="master-meter" id="meterMaster"></div>
+        <div class="fader-col">
+          <div class="fader-label">B</div>
+          <input id="volB" type="range" min="0" max="1" step="0.001" value="0.9" class="v-fader">
+        </div>
+      </div>
+
+      <div class="meter-row">
+        <div class="meter" id="meterA"></div>
+        <div class="meter" id="meterB"></div>
+      </div>
+
+      <div class="cross-zone">
+        <div class="cross-title">CROSSFADER</div>
+        <div class="cross-wrap">
+          <div id="crossTrack" class="cross-track" aria-label="Crossfader" role="slider" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0.5" tabindex="0">
+            <div id="crossHandle" class="cross-handle"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="library-block">
+        <div class="blk-title">Library</div>
+        <div class="lib-actions">
+          <button id="scanAudio" class="btn">Scan /audio folder</button>
+          <button id="clearQueue" class="btn">Clear</button>
+        </div>
+        <div id="libList" class="liblist"></div>
+      </div>
+    </section>
+
+    <section class="deck deck-b card">
+      <div class="deck-head">DECK B <span id="timeB">0:00 / 0:00</span></div>
+      <div class="deck-controls">
+        <button id="loadLocalB" class="btn">Load B</button>
+        <button id="playB" class="btn led">Play</button>
+        <button id="stopB" class="btn led stop">Stop</button>
+        <button id="cueB" class="btn">Cue</button>
+      </div>
+
+      <div class="fx-title">Effects</div>
+      <div id="fxBtnsB" class="fx-grid"></div>
+      <div class="hs-title">Hot Spots</div>
+      <div id="hotBtnsB" class="hot-grid"></div>
+
+      <div class="platter-wrap">
+        <div class="platter-disc" id="platterB">
+          <div class="platter-core"><img src="../assets/mt-logo.svg" class="platter-logo" alt="MT logo"></div>
+        </div>
+      </div>
+      <div class="meta">Track: <span id="trackBName">—</span></div>
+
+      <div class="samples-block deck-samples">
+        <div class="blk-title">Deck B Samples (9-16)</div>
+        <div id="samplePadsB" class="sample-grid deck"></div>
+      </div>
+    </section>
+  </main>
+
+  <section class="record-panel card">
+    <div class="record-head">Recorded Mix</div>
+    <canvas id="recordWave" class="wave-canvas" width="1400" height="90"></canvas>
+    <div class="record-controls">
+      <button id="recordBtn" class="btn rec">● Record</button>
+      <button id="stopRecordBtn" class="btn" disabled>Stop</button>
+      <button id="playRecordBtn" class="btn" disabled>Playback</button>
+      <a id="downloadRecord" class="btn" download="powermix-level2.wav" aria-disabled="true">Download .wav</a>
+      <span id="recordTimer">0:00 / 3:00</span>
+    </div>
+  </section>
+
+  <script src="app.js?v=2"></script>
+</body>
+</html>
