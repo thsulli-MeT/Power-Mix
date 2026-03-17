@@ -179,61 +179,72 @@ function applyEffect(deck, fx, amt){
 function buildFx(containerId, deck, side){
   const wrap=$(containerId); wrap.innerHTML="";
   const slots = fxSlots[side];
-  const clearFx = ()=>{ deck.activeFxSlot = null; wrap.querySelectorAll(".fxbtn").forEach(x=>x.classList.remove("on")); deck.setFilterNorm(1); deck.setEchoWet(0); deck.setReverbWet(0); };
+
+  const setVisual=(btn, amt)=>{
+    btn.style.setProperty("--fx-amt", clamp01(amt).toFixed(3));
+    btn.classList.toggle("active", amt>0);
+  };
+
+  const clearFx = ()=>{
+    deck.activeFxSlot = null;
+    wrap.querySelectorAll(".fxbtn").forEach((x)=>{ x.classList.remove("active"); x.style.setProperty("--fx-amt","0"); });
+    deck.setFilterNorm(1); deck.setEchoWet(0); deck.setReverbWet(0);
+  };
+
   slots.forEach((fxIdx, slotIdx)=>{
     const b=document.createElement("button");
     b.className="fxbtn";
     b.dataset.slot=String(slotIdx);
+    b.style.setProperty("--fx-amt","0");
 
     const setLabel=()=>{ b.textContent = EFFECT_LIBRARY[slots[slotIdx]].label; };
     setLabel();
 
-    let dragging=false, startY=0, moved=0;
+    let dragging=false, startY=0;
+    const applyAmt=(amt)=>{
+      deck.activeFxSlot = slotIdx;
+      setVisual(b, amt);
+      applyEffect(deck, EFFECT_LIBRARY[slots[slotIdx]], amt);
+    };
 
     b.addEventListener("pointerdown", (e)=>{
       if(e.altKey) return;
-      dragging=true; moved=0; startY=e.clientY;
+      dragging=true; startY=e.clientY;
       b.setPointerCapture(e.pointerId);
-      wrap.querySelectorAll(".fxbtn").forEach(x=>x.classList.remove("on"));
-      b.classList.add("on");
-      deck.activeFxSlot = slotIdx;
-      applyEffect(deck, EFFECT_LIBRARY[slots[slotIdx]], 0.2);
-    });
-    b.addEventListener("pointermove", (e)=>{
-      if(!dragging) return;
-      moved = Math.max(moved, Math.abs(e.clientY-startY));
-      const amt = clamp01((startY - e.clientY) / 110);
-      applyEffect(deck, EFFECT_LIBRARY[slots[slotIdx]], Math.max(0.05, amt));
-    });
-    b.addEventListener("pointerup", ()=>{
-      if(!dragging) return;
-      dragging=false;
-      if(moved < 6) applyEffect(deck, EFFECT_LIBRARY[slots[slotIdx]], 1.0);
+      clearFx();
+      applyAmt(0.22);
+      e.preventDefault();
     });
 
+    b.addEventListener("pointermove", (e)=>{
+      if(!dragging) return;
+      const amt = clamp01(0.22 + ((startY - e.clientY) / 130));
+      applyAmt(Math.max(0.03, amt));
+    });
+
+    const release=()=>{
+      if(!dragging) return;
+      dragging=false;
+      clearFx();
+    };
+    b.addEventListener("pointerup", release);
+    b.addEventListener("pointercancel", release);
+    b.addEventListener("pointerleave", release);
+
     b.addEventListener("click", (e)=>{
-      if(e.altKey){
-        const menu = EFFECT_LIBRARY.map((x,i)=>`${i+1}. ${x.label}`).join("\n");
-        const pick = prompt(`Assign effect to this button (1-16):\n${menu}`, String(slots[slotIdx]+1));
-        if(!pick) return;
-        const idx = Math.max(1, Math.min(16, Number(pick)||1)) - 1;
-        slots[slotIdx] = idx;
-        setLabel();
-        return;
-      }
-      if(deck.activeFxSlot===slotIdx){
-        clearFx();
-        return;
-      }
-      wrap.querySelectorAll(".fxbtn").forEach(x=>x.classList.remove("on"));
-      b.classList.add("on");
-      deck.activeFxSlot = slotIdx;
-      applyEffect(deck, EFFECT_LIBRARY[slots[slotIdx]], 1.0);
+      if(!e.altKey) return;
+      const menu = EFFECT_LIBRARY.map((x,i)=>`${i+1}. ${x.label}`).join("\n");
+      const pick = prompt(`Assign effect to this button (1-16):\n${menu}`, String(slots[slotIdx]+1));
+      if(!pick) return;
+      const idx = Math.max(1, Math.min(16, Number(pick)||1)) - 1;
+      slots[slotIdx] = idx;
+      setLabel();
     });
 
     wrap.appendChild(b);
   });
 }
+
 
 const deckA=new Deck("A");
 const deckB=new Deck("B");
