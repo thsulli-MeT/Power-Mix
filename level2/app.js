@@ -7,6 +7,8 @@ let masterGain = null;
 let masterAnalyser = null;
 let recordDest = null;
 let crossValue = 0.5;
+const keysDown = new Set();
+const keyDownAt = {};
 
 function clamp01(v){ return Math.max(0, Math.min(1, v)); }
 function fmtTime(sec){ if(!isFinite(sec)||sec<0) return "0:00"; const m=Math.floor(sec/60), s=Math.floor(sec%60); return `${m}:${String(s).padStart(2,"0")}`; }
@@ -92,6 +94,7 @@ class Deck{
     this.platterAngle=0; this.platterVel=0; this.isScratching=false;
     this.cuePoint=0;
     this.hot=Array(8).fill(null);
+    this.activeFxSlot = null;
   }
 
   connect(){
@@ -130,6 +133,7 @@ class Deck{
     this.scratchBuffer=decoded; this.scratchBufferRev=reverseBuffer(decoded);
     this.cuePoint=0;
     this.hot=Array(8).fill(null);
+    this.activeFxSlot = null;
   }
 
   tick(dt){
@@ -169,6 +173,7 @@ function applyEffect(deck, fx, amt){
 function buildFx(containerId, deck, side){
   const wrap=$(containerId); wrap.innerHTML="";
   const slots = fxSlots[side];
+  const clearFx = ()=>{ deck.activeFxSlot = null; wrap.querySelectorAll(".fxbtn").forEach(x=>x.classList.remove("on")); deck.setFilterNorm(1); deck.setEchoWet(0); deck.setReverbWet(0); };
   slots.forEach((fxIdx, slotIdx)=>{
     const b=document.createElement("button");
     b.className="fxbtn";
@@ -185,6 +190,7 @@ function buildFx(containerId, deck, side){
       b.setPointerCapture(e.pointerId);
       wrap.querySelectorAll(".fxbtn").forEach(x=>x.classList.remove("on"));
       b.classList.add("on");
+      deck.activeFxSlot = slotIdx;
       applyEffect(deck, EFFECT_LIBRARY[slots[slotIdx]], 0.2);
     });
     b.addEventListener("pointermove", (e)=>{
@@ -209,8 +215,13 @@ function buildFx(containerId, deck, side){
         setLabel();
         return;
       }
+      if(deck.activeFxSlot===slotIdx){
+        clearFx();
+        return;
+      }
       wrap.querySelectorAll(".fxbtn").forEach(x=>x.classList.remove("on"));
       b.classList.add("on");
+      deck.activeFxSlot = slotIdx;
       applyEffect(deck, EFFECT_LIBRARY[slots[slotIdx]], 1.0);
     });
 
@@ -525,6 +536,35 @@ const meterA=buildMeter($("meterA"),12);
 const meterB=buildMeter($("meterB"),12);
 const meterMaster=buildMeter($("meterMaster"),24);
 
+
+function keyHeldSec(k, now){ return keysDown.has(k) ? Math.max(0, (now - (keyDownAt[k]||now))/1000) : 0; }
+
+function updateKeyboardControls(dt, now){
+  if(keysDown.has("a")) setCross(0);
+  if(keysDown.has("s")) setCross(1);
+
+  if(keysDown.has("q")){
+    const held = keyHeldSec("q", now);
+    const speed = (1/3) * Math.min(4.2, 1 + held*2.2);
+    setCross(crossValue - speed*dt);
+  }
+  if(keysDown.has("w")){
+    const held = keyHeldSec("w", now);
+    const speed = (1/3) * Math.min(4.2, 1 + held*2.2);
+    setCross(crossValue + speed*dt);
+  }
+
+  const volA = $("volA"), volB = $("volB");
+  if(volA){
+    if(keysDown.has("1")){ const held=keyHeldSec("1", now); volA.value = String(clamp01(parseFloat(volA.value) - dt*(0.22 + Math.min(1.0,held*0.85)))); setCross(crossValue); }
+    if(keysDown.has("2")){ const held=keyHeldSec("2", now); volA.value = String(clamp01(parseFloat(volA.value) + dt*(0.22 + Math.min(1.0,held*0.85)))); setCross(crossValue); }
+  }
+  if(volB){
+    if(keysDown.has("3")){ const held=keyHeldSec("3", now); volB.value = String(clamp01(parseFloat(volB.value) - dt*(0.22 + Math.min(1.0,held*0.85)))); setCross(crossValue); }
+    if(keysDown.has("4")){ const held=keyHeldSec("4", now); volB.value = String(clamp01(parseFloat(volB.value) + dt*(0.22 + Math.min(1.0,held*0.85)))); setCross(crossValue); }
+  }
+}
+
 function wire(){
   $("enableAudio").addEventListener("click", enableAudio);
   wireCrossFader();
@@ -539,11 +579,14 @@ function wire(){
   loadManifest().then(()=>{ initSamplesFromManifest(); renderLibrary(); });
   $("scanAudio")?.addEventListener("click",()=>renderLibrary());
   $("clearQueue")?.addEventListener("click",()=>{ const w=$("libList"); if(w) w.innerHTML=""; });
+  document.addEventListener("keydown", (e)=>{ const k=(e.key||"").toLowerCase(); if(["a","s","q","w","1","2","3","4"].includes(k)){ keysDown.add(k); if(!keyDownAt[k]) keyDownAt[k]=performance.now(); e.preventDefault(); }});
+  document.addEventListener("keyup", (e)=>{ const k=(e.key||"").toLowerCase(); keysDown.delete(k); delete keyDownAt[k]; });
 }
 
 let last=performance.now();
 function loop(now){
   const dt=Math.min(0.05,(now-last)/1000); last=now;
+  updateKeyboardControls(dt, now);
   deckA.tick(dt); deckB.tick(dt);
   $("platterA").style.transform=`rotate(${deckA.platterAngle}rad)`;
   $("platterB").style.transform=`rotate(${deckB.platterAngle}rad)`;
