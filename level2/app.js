@@ -145,8 +145,8 @@ function buildFx(containerId, deck){
 const deckA=new Deck("A");
 const deckB=new Deck("B");
 
-const sampleBank=Array(8).fill(null);
-const sampleVoices=Array(8).fill(null);
+const sampleBank=Array(16).fill(null);
+const sampleVoices=Array(16).fill(null);
 let manifest=null;
 
 function playScratchGrain(deck,tSec,dir){
@@ -217,7 +217,7 @@ function buildHot(containerId, deck){
 
 function renderSamplePads(){
   const wrap=$("samplePads"); if(!wrap) return; wrap.innerHTML="";
-  for(let i=0;i<8;i++){
+  for(let i=0;i<16;i++){
     const b=document.createElement("button"); b.className="sample-pad"+(sampleVoices[i]?" latched":"");
     const label=(sampleBank[i]?.name||`PAD ${i+1}`).replace(/\.(wav|mp3)$/i,"");
     b.textContent=label.length>10?label.slice(0,10)+"…":label;
@@ -268,6 +268,9 @@ async function scanAudio(){
   if(!manifest) await loadManifest();
   if(manifest?.library?.length){
     return manifest.library.map(it=>({name:it.title||it.name||it.file||it.path, url:resolveMediaUrl(it.path||it.file)}));
+  }
+  if(manifest?.tracks?.length){
+    return manifest.tracks.map(it=>({name:it.title||it.name||it.file||it.path, url:resolveMediaUrl(it.file||it.path)}));
   }
   return [];
 }
@@ -390,6 +393,8 @@ function wireDeckControls(){
   const toggle=(deck,btn)=>{ if(!deck.audio.src) return; if(deck.audio.paused){ deck.audio.play(); btn.classList.add("engaged"); } else { deck.audio.pause(); btn.classList.remove("engaged"); } };
   $("playA").addEventListener("click",()=>toggle(deckA,$("playA")));
   $("playB").addEventListener("click",()=>toggle(deckB,$("playB")));
+  $("stopA").addEventListener("click",()=>{ if(!deckA.audio.src) return; deckA.audio.pause(); deckA.audio.currentTime=0; $("playA").classList.remove("engaged"); });
+  $("stopB").addEventListener("click",()=>{ if(!deckB.audio.src) return; deckB.audio.pause(); deckB.audio.currentTime=0; $("playB").classList.remove("engaged"); });
 
   $("cueA").addEventListener("click",()=>{ if(!deckA.audio.src) return; if(deckA.audio.paused){ deckA.cuePoint=deckA.audio.currentTime||0; } else { deckA.audio.currentTime=deckA.cuePoint||0; deckA.audio.pause(); $("playA").classList.remove("engaged"); } });
   $("cueB").addEventListener("click",()=>{ if(!deckB.audio.src) return; if(deckB.audio.paused){ deckB.cuePoint=deckB.audio.currentTime||0; } else { deckB.audio.currentTime=deckB.cuePoint||0; deckB.audio.pause(); $("playB").classList.remove("engaged"); } });

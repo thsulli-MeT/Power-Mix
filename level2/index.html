@@ -35,6 +35,7 @@
       <div class="deck-controls">
         <button id="loadLocalA" class="btn">Load A</button>
         <button id="playA" class="btn led">Play</button>
+        <button id="stopA" class="btn led stop">Stop</button>
         <button id="cueA" class="btn">Cue</button>
       </div>
 
@@ -63,16 +64,11 @@
         <button id="runTransition" class="btn led">Run</button>
       </div>
       <div class="center-row">
-        <div class="channel-strip center-faders">
+        <div class="channel-strip center-faders left">
           <div class="fader-col">
             <div class="fader-label">A VOL</div>
             <input id="volA" type="range" min="0" max="1" step="0.001" value="0.9" class="v-fader">
             <div class="meter" id="meterA"></div>
-          </div>
-          <div class="fader-col">
-            <div class="fader-label">B VOL</div>
-            <input id="volB" type="range" min="0" max="1" step="0.001" value="0.9" class="v-fader">
-            <div class="meter" id="meterB"></div>
           </div>
         </div>
         <div class="master-meter" id="meterMaster"></div>
@@ -81,10 +77,17 @@
             <div id="crossHandle" class="cross-handle"></div>
           </div>
         </div>
+        <div class="channel-strip center-faders right">
+          <div class="fader-col">
+            <div class="fader-label">B VOL</div>
+            <input id="volB" type="range" min="0" max="1" step="0.001" value="0.9" class="v-fader">
+            <div class="meter" id="meterB"></div>
+          </div>
+        </div>
       </div>
 
       <div class="samples-block">
-        <div class="blk-title">Samples (8)</div>
+        <div class="blk-title">Samples (16)</div>
         <div id="samplePads" class="sample-grid"></div>
       </div>
 
@@ -103,6 +106,7 @@
       <div class="deck-controls">
         <button id="loadLocalB" class="btn">Load B</button>
         <button id="playB" class="btn led">Play</button>
+        <button id="stopB" class="btn led stop">Stop</button>
         <button id="cueB" class="btn">Cue</button>
       </div>
 
