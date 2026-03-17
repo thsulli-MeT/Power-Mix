@@ -36,6 +36,33 @@ function drawWave(canvas, data, color){
   ctx.stroke();
 }
 
+function drawDeckWave(canvas, deck, color){
+  drawWave(canvas, deck.waveform, color);
+  if(!canvas) return;
+  const ctx=canvas.getContext("2d"), w=canvas.width, h=canvas.height;
+  const dur=deck.duration||deck.audio.duration||0;
+  if(dur>0){
+    deck.hot.forEach((t)=>{
+      if(t==null) return;
+      const x=clamp01(t/dur)*w;
+      ctx.fillStyle="rgba(255,255,255,.55)";
+      ctx.fillRect(x-1,0,3,h);
+    });
+    const x=clamp01((deck.audio.currentTime||0)/dur)*w;
+    ctx.strokeStyle="rgba(100,255,180,.95)";
+    ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
+  }
+}
+
+function seekFromWave(e, deck, canvas){
+  const dur=deck.duration||deck.audio.duration||0;
+  if(!dur || !canvas) return;
+  const r=canvas.getBoundingClientRect();
+  const x=(e.clientX-r.left)/r.width;
+  deck.audio.currentTime=clamp01(x)*dur;
+}
+
 
 function resolveMediaUrl(url){
   if(!url) return "";
@@ -153,20 +180,25 @@ function playScratchGrain(deck,tSec,dir){
   if(!audioCtx || !deck.scratchBuffer || !deck.scratchBufferRev) return;
   const dur=deck.scratchBuffer.duration||0; if(dur<=0) return;
   const speed=Math.abs(dir);
-  const grainDur=Math.max(0.014,0.03-Math.min(0.012,speed*0.00002));
-  const rate=Math.max(0.86,Math.min(1.22,1+dir*0.00034));
-  const gainVal=Math.max(0.24,Math.min(0.68,0.34+speed*0.00012));
+  const grainDur=Math.max(0.02,0.046-Math.min(0.02,speed*0.00002));
+  const rate=Math.max(0.75,Math.min(1.12,1+dir*0.00024));
+  const gainVal=Math.max(0.35,Math.min(0.9,0.48+speed*0.00018));
   const now=audioCtx.currentTime;
   const g=audioCtx.createGain();
+  const tone=audioCtx.createBiquadFilter();
+  tone.type="lowpass";
+  tone.frequency.value=4200;
+  tone.Q.value=0.6;
   g.gain.setValueAtTime(0.0001,now);
-  g.gain.linearRampToValueAtTime(gainVal,now+0.0035);
+  g.gain.linearRampToValueAtTime(gainVal,now+0.006);
+  g.gain.linearRampToValueAtTime(Math.max(0.22,gainVal*0.62),now+grainDur*0.7);
   g.gain.exponentialRampToValueAtTime(0.0001,now+grainDur);
-  g.connect(masterGain);
+  tone.connect(g); g.connect(masterGain);
 
   const src=audioCtx.createBufferSource(); src.playbackRate.value=rate;
   if(dir>=0){ src.buffer=deck.scratchBuffer; src.start(now,Math.max(0,Math.min(dur-grainDur,tSec)),grainDur); }
   else{ src.buffer=deck.scratchBufferRev; const off=Math.max(0,Math.min(dur-grainDur,(dur-tSec)-grainDur)); src.start(now,off,grainDur); }
-  src.connect(g); src.stop(now+grainDur+0.006);
+  src.connect(tone); src.stop(now+grainDur+0.01);
 }
 
 function wireScratch(platterId, deck){
@@ -423,7 +455,7 @@ function wireTransitions(){
 }
 
 function buildMeter(container,count){ container.innerHTML=""; const cells=[]; for(let i=0;i<count;i++){ const d=document.createElement("div"); d.className="led-cell"; container.appendChild(d); cells.push(d); } return cells; }
-function paintMeter(cells,n){ const on=Math.round(n*cells.length); cells.forEach((c,i)=>{ c.classList.remove("on","warn","clip"); if(i<on){ const hi=i>cells.length-3, mid=i>cells.length-6; c.classList.add(hi?"clip":mid?"warn":"on"); }}); }
+function paintMeter(cells,n){ const on=Math.round(n*cells.length); cells.forEach((c,i)=>{ c.classList.remove("on","warn","clip"); if(i>=cells.length-on){ const rank=(cells.length-1)-i; const hi=rank<2, mid=rank<5; c.classList.add(hi?"clip":mid?"warn":"on"); }}); }
 
 function wireRecording(){
   $("recordBtn").addEventListener("click", async ()=>{ if(!unlocked) await enableAudio(); startRecording(); });
@@ -441,6 +473,8 @@ function wire(){
   wireDeckControls();
   wireTransitions();
   wireRecording();
+  $("waveA")?.addEventListener("click",(e)=>seekFromWave(e,deckA,$("waveA")));
+  $("waveB")?.addEventListener("click",(e)=>seekFromWave(e,deckB,$("waveB")));
   buildHot("hotBtnsA",deckA);
   buildHot("hotBtnsB",deckB);
   renderSamplePads();
@@ -457,6 +491,8 @@ function loop(now){
   $("platterB").style.transform=`rotate(${deckB.platterAngle}rad)`;
   $("timeA").textContent=`${fmtTime(deckA.audio.currentTime)} / ${fmtTime(deckA.duration||deckA.audio.duration||0)}`;
   $("timeB").textContent=`${fmtTime(deckB.audio.currentTime)} / ${fmtTime(deckB.duration||deckB.audio.duration||0)}`;
+  drawDeckWave($("waveA"), deckA, "#ff5f6d");
+  drawDeckWave($("waveB"), deckB, "#36d8ff");
 
   if(unlocked){
     paintMeter(meterA, Math.min(1, estimateRms(deckA.analyser)*3.4));
