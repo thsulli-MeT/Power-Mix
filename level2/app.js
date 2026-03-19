@@ -77,6 +77,11 @@ async function initAccessGate(){
 
 function clamp01(v){ return Math.max(0, Math.min(1, v)); }
 function fmtTime(sec){ if(!isFinite(sec)||sec<0) return "0:00"; const m=Math.floor(sec/60), s=Math.floor(sec%60); return `${m}:${String(s).padStart(2,"0")}`; }
+function isTypingTarget(target){
+  if(!target) return false;
+  const tag=(target.tagName||"").toLowerCase();
+  return target.isContentEditable || tag==="input" || tag==="textarea" || tag==="select";
+}
 
 function reverseBuffer(buf){
   const rev = audioCtx.createBuffer(buf.numberOfChannels, buf.length, buf.sampleRate);
@@ -843,8 +848,22 @@ function wire(){
     };
     input.click();
   });
-  document.addEventListener("keydown", (e)=>{ const k=(e.key||"").toLowerCase(); if(["a","s","q","w","r","1","2","3","4"].includes(k)){ if(k==="r" && !e.repeat) triggerTransition(); keysDown.add(k); if(!keyDownAt[k]) keyDownAt[k]=performance.now(); e.preventDefault(); }});
-  document.addEventListener("keyup", (e)=>{ const k=(e.key||"").toLowerCase(); keysDown.delete(k); delete keyDownAt[k]; });
+  document.addEventListener("keydown", (e)=>{
+    if(isTypingTarget(e.target)) return;
+    const k=(e.key||"").toLowerCase();
+    if(["a","s","q","w","r","1","2","3","4"].includes(k)){
+      if(k==="r" && !e.repeat) triggerTransition();
+      keysDown.add(k);
+      if(!keyDownAt[k]) keyDownAt[k]=performance.now();
+      e.preventDefault();
+    }
+  });
+  document.addEventListener("keyup", (e)=>{
+    if(isTypingTarget(e.target)) return;
+    const k=(e.key||"").toLowerCase();
+    keysDown.delete(k);
+    delete keyDownAt[k];
+  });
 }
 
 let last=performance.now();
