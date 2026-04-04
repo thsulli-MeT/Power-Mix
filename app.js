@@ -263,6 +263,11 @@ class Deck {
 let deckA = new Deck("A");
 let deckB = new Deck("B");
 let nextTransitionDir = "AtoB";
+const AUTO_MIX_MIN_SECONDS = 60;
+let autoMixEnabled = false;
+let autoMixBusy = false;
+let autoMixCurrentDeck = "A";
+let autoMixLibrary = [];
 
 
 const sampleBank = Array(8).fill(null); // {name, buffer}
@@ -801,6 +806,13 @@ function wire(){
   $("loadLocalB")?.addEventListener("click", ()=>pick(deckB));
   $("playA")?.addEventListener("click", ()=>deckA.playPause());
   $("playB")?.addEventListener("click", ()=>deckB.playPause());
+  $("loopA")?.addEventListener("change", (e)=>{ deckA.audio.loop = !!e.target?.checked; });
+  $("loopB")?.addEventListener("change", (e)=>{ deckB.audio.loop = !!e.target?.checked; });
+  $("autoMixBtn")?.addEventListener("click", async ()=>{
+    if(autoMixEnabled){ stopAutoMix(); return; }
+    setAutoMixNote(`Scanning library for tracks longer than ${AUTO_MIX_MIN_SECONDS} seconds...`);
+    await startAutoMix();
+  });
 
   wireScratch("platterA", deckA);
   wireScratch("platterB", deckB);
@@ -850,6 +862,7 @@ function wire(){
   // shortcuts modal
   $("shortcutsBtn")?.addEventListener("click", ()=> $("shortcutsModal")?.classList.remove("hidden"));
   $("closeShortcuts")?.addEventListener("click", ()=> $("shortcutsModal")?.classList.add("hidden"));
+  syncAutoMixButton();
 }
 
 function seekFromWave(e, deck, canvas){
@@ -954,6 +967,108 @@ function runTransition(){
   };
   requestAnimationFrame(step);
 }
+
+function getDeckByLetter(letter){ return letter === "B" ? deckB : deckA; }
+function getOppositeDeckLetter(letter){ return letter === "A" ? "B" : "A"; }
+
+function setAutoMixNote(msg){
+  const el = $("autoMixNote");
+  if(el) el.textContent = msg;
+}
+function syncAutoMixButton(){
+  const btn = $("autoMixBtn");
+  if(!btn) return;
+  btn.textContent = autoMixEnabled ? "Stop Auto Mix" : "Start Auto Mix";
+  btn.classList.toggle("is-active", autoMixEnabled);
+}
+
+async function getTrackDurationSec(url){
+  return await new Promise((resolve)=>{
+    const probe = new Audio();
+    const done = (val)=>{
+      probe.removeAttribute("src");
+      probe.load();
+      resolve(val);
+    };
+    probe.preload = "metadata";
+    probe.onloadedmetadata = ()=>{
+      const d = Number(probe.duration);
+      done(isFinite(d) && d > 0 ? d : 0);
+    };
+    probe.onerror = ()=>done(0);
+    probe.src = encodeURI(url);
+  });
+}
+
+async function buildAutoMixLibrary(){
+  const items = await scanAudio();
+  const enriched = [];
+  for(const it of items){
+    const durationSec = await getTrackDurationSec(it.url);
+    if(durationSec >= AUTO_MIX_MIN_SECONDS){
+      enriched.push({...it, durationSec});
+    }
+  }
+  return enriched;
+}
+
+function chooseNextAutoMixTrack(excludeUrls = []){
+  if(!autoMixLibrary.length) return null;
+  const filtered = autoMixLibrary.filter(t => !excludeUrls.includes(t.url));
+  const pool = filtered.length ? filtered : autoMixLibrary;
+  return pool[Math.floor(Math.random() * pool.length)] || null;
+}
+
+async function loadAndPlayDeck(deckLetter, track){
+  const deck = getDeckByLetter(deckLetter);
+  await deck.loadFromUrl(encodeURI(track.url));
+  updateMeta();
+  redraw();
+  await deck.audio.play();
+}
+
+async function queueAutoMixIntoDeck(deckLetter){
+  if(autoMixBusy) return;
+  autoMixBusy = true;
+  try{
+    const exclude = [deckA.audio.src, deckB.audio.src].filter(Boolean);
+    const nextTrack = chooseNextAutoMixTrack(exclude);
+    if(!nextTrack) return;
+    await loadAndPlayDeck(deckLetter, nextTrack);
+  }catch(err){
+    console.warn("Auto mix queue failed", err);
+  }finally{
+    autoMixBusy = false;
+  }
+}
+
+function stopAutoMix(){
+  autoMixEnabled = false;
+  syncAutoMixButton();
+  setAutoMixNote(`Auto Mix stopped. Uses tracks longer than ${AUTO_MIX_MIN_SECONDS} seconds when enabled.`);
+}
+
+async function startAutoMix(){
+  if(!unlocked) await enableAudio();
+  autoMixLibrary = await buildAutoMixLibrary();
+  if(autoMixLibrary.length < 2){
+    setAutoMixNote(`Need at least 2 full tracks (>${AUTO_MIX_MIN_SECONDS}s) in Library for Auto Mix.`);
+    autoMixEnabled = false;
+    syncAutoMixButton();
+    return;
+  }
+  autoMixEnabled = true;
+  syncAutoMixButton();
+  setAutoMixNote(`Auto Mix ON • ${autoMixLibrary.length} full tracks available.`);
+
+  if(deckA.audio.paused && deckB.audio.paused){
+    autoMixCurrentDeck = "A";
+    await queueAutoMixIntoDeck("A");
+  }else{
+    autoMixCurrentDeck = !deckA.audio.paused ? "A" : "B";
+  }
+}
+
 function updateMeta(){
   $("trackAName").textContent = deckA.audio.src ? deckA.audio.src.split("/").pop() : "—";
   $("trackBName").textContent = deckB.audio.src ? deckB.audio.src.split("/").pop() : "—";
@@ -973,6 +1088,27 @@ function loop(now){
 
   $("timeA").textContent = `${fmtTime(deckA.audio.currentTime)} / ${fmtTime(deckA.duration||deckA.audio.duration||0)}`;
   $("timeB").textContent = `${fmtTime(deckB.audio.currentTime)} / ${fmtTime(deckB.duration||deckB.audio.duration||0)}`;
+
+  if(autoMixEnabled && !autoMixBusy){
+    const currentDeck = getDeckByLetter(autoMixCurrentDeck);
+    const otherLetter = getOppositeDeckLetter(autoMixCurrentDeck);
+    const otherDeck = getDeckByLetter(otherLetter);
+    const dur = currentDeck.duration || currentDeck.audio.duration || 0;
+    const remaining = dur - (currentDeck.audio.currentTime || 0);
+
+    if(!currentDeck.audio.paused && isFinite(remaining) && remaining > 0 && remaining <= 10 && otherDeck.audio.paused){
+      queueAutoMixIntoDeck(otherLetter).then(()=>{
+        if(otherDeck.audio.paused) return;
+        nextTransitionDir = autoMixCurrentDeck === "A" ? "AtoB" : "BtoA";
+        runTransition();
+        autoMixCurrentDeck = otherLetter;
+      });
+    }
+
+    if(deckA.audio.paused && deckB.audio.paused){
+      queueAutoMixIntoDeck(autoMixCurrentDeck);
+    }
+  }
 
   overlays();
   requestAnimationFrame(loop);

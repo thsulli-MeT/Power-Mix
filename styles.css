@@ -315,6 +315,16 @@ body{
 .deck-title{ font-weight:1100; letter-spacing:.18em; opacity:.9; }
 .deck-meta{ font-size: 12px; opacity:.75; }
 .deck-controls{ display:flex; gap:10px; margin-top: 10px; }
+.deck-controls .loop-toggle{
+  margin-top: 0;
+  padding: 0 6px;
+  font-size: 12px;
+  opacity: .95;
+}
+.automix .btn.is-active{
+  border-color: rgba(53,215,255,.9);
+  box-shadow: 0 0 0 2px rgba(53,215,255,.25) inset;
+}
 
 .platter{
   margin-top: 16px;
