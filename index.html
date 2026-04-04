@@ -75,6 +75,7 @@
           <button id="loadLocalA" class="btn ghost">Load (Local)</button>
           <button id="playA" class="btn primary">Play/Pause</button>
           <button id="cueA" class="btn ghost">Cue</button>
+          <label class="chk loop-toggle"><input id="loopA" type="checkbox"/> Loop</label>
         </div>
 
         <div class="platter">
@@ -126,6 +127,14 @@
             <button id="runTransition" class="btn ghost">Run</button>
           </div>
           <div class="note" id="transitionNote">Runs A→B, then next time B→A.</div>
+        </div>
+
+        <div class="automix">
+          <div class="block-title">Auto Mix</div>
+          <div class="row">
+            <button id="autoMixBtn" class="btn ghost">Start Auto Mix</button>
+          </div>
+          <div class="note" id="autoMixNote">Plays continuously using library tracks longer than 60 seconds.</div>
         </div>
 
         
@@ -181,6 +190,7 @@
           <button id="loadLocalB" class="btn ghost">Load (Local)</button>
           <button id="playB" class="btn primary">Play/Pause</button>
           <button id="cueB" class="btn ghost">Cue</button>
+          <label class="chk loop-toggle"><input id="loopB" type="checkbox"/> Loop</label>
         </div>
 
         <div class="platter">
