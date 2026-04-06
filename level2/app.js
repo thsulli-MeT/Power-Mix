@@ -210,6 +210,8 @@ class Deck{
     this.sourceUrl = null;
     this.sourceName = file.name;
     this.sourceType = "local";
+    if(this.name==="A") this.audio.loop = Boolean($("loopA")?.checked);
+    if(this.name==="B") this.audio.loop = Boolean($("loopB")?.checked);
   }
 
   tick(dt){
@@ -318,6 +320,11 @@ function buildFx(containerId, deck, side){
 
 const deckA=new Deck("A");
 const deckB=new Deck("B");
+const AUTO_MIX_MIN_SECONDS = 60;
+let autoMixEnabled = false;
+let autoMixBusy = false;
+let autoMixCurrentDeck = "A";
+let autoMixLibrary = [];
 
 const sampleBank=Array(16).fill(null);
 const sampleVoices=Array(16).fill(null);
@@ -473,6 +480,106 @@ async function scanAudio(){
   return [];
 }
 
+function deckByLetter(letter){ return letter==="B" ? deckB : deckA; }
+function oppositeDeckLetter(letter){ return letter==="A" ? "B" : "A"; }
+function setAutoMixNote(msg){ const n=$("autoMixNote"); if(n) n.textContent=msg; }
+function syncAutoMixButton(){
+  const b=$("autoMixBtn");
+  if(!b) return;
+  b.textContent = autoMixEnabled ? "Stop Auto Mix" : "Start Auto Mix";
+  b.classList.toggle("auto-active", autoMixEnabled);
+}
+
+async function getTrackDurationSec(url){
+  return await new Promise((resolve)=>{
+    const probe = new Audio();
+    const done=(v)=>{ probe.removeAttribute("src"); probe.load(); resolve(v); };
+    probe.preload = "metadata";
+    probe.onloadedmetadata = ()=>{ const d=Number(probe.duration); done(isFinite(d)&&d>0?d:0); };
+    probe.onerror = ()=>done(0);
+    probe.src = encodeURI(url);
+  });
+}
+
+async function buildAutoMixLibrary(minSeconds = AUTO_MIX_MIN_SECONDS){
+  const items=await scanAudio();
+  const full=[];
+  for(const it of items){
+    const durationSec=await getTrackDurationSec(it.url);
+    if(durationSec >= minSeconds) full.push({...it, durationSec});
+  }
+  return full;
+}
+
+function pickAutoMixTrack(excludeUrls=[]){
+  if(!autoMixLibrary.length) return null;
+  const filtered = autoMixLibrary.filter((t)=>!excludeUrls.includes(resolveMediaUrl(t.url)));
+  const pool = filtered.length ? filtered : autoMixLibrary;
+  return pool[Math.floor(Math.random()*pool.length)] || null;
+}
+
+async function loadDeckForAutoMix(deckLetter, track, shouldPlay){
+  const deck=deckByLetter(deckLetter);
+  const playBtn = deckLetter==="A" ? $("playA") : $("playB");
+  await loadDeckFromUrl(deck, track.url, track.name, deckLetter==="A"?"trackAName":"trackBName", deckLetter==="A"?"waveA":"waveB");
+  if(shouldPlay){
+    await deck.audio.play().catch(()=>{
+      setAutoMixNote("Auto Mix: browser blocked autoplay. Press Play once, then Start Auto Mix again.");
+      stopAutoMix();
+    });
+    playBtn?.classList.add("engaged");
+    return;
+  }
+  deck.audio.pause();
+  deck.audio.currentTime = 0;
+  playBtn?.classList.remove("engaged");
+}
+
+async function queueAutoMixIntoDeck(deckLetter, shouldPlay=false){
+  if(autoMixBusy) return;
+  autoMixBusy = true;
+  try{
+    const exclude=[deckA.audio.src, deckB.audio.src].filter(Boolean);
+    const nextTrack = pickAutoMixTrack(exclude);
+    if(!nextTrack) return;
+    await loadDeckForAutoMix(deckLetter, nextTrack, shouldPlay);
+  }catch(err){
+    console.warn("Auto mix queue failed", err);
+  }finally{
+    autoMixBusy = false;
+  }
+}
+
+function stopAutoMix(){
+  autoMixEnabled = false;
+  syncAutoMixButton();
+  setAutoMixNote(`Auto Mix stopped. Uses tracks longer than ${AUTO_MIX_MIN_SECONDS} seconds.`);
+}
+
+async function startAutoMix(){
+  if(!unlocked) await enableAudio();
+  autoMixLibrary = await buildAutoMixLibrary(AUTO_MIX_MIN_SECONDS);
+  if(autoMixLibrary.length < 2){
+    autoMixLibrary = await buildAutoMixLibrary(45);
+  }
+  if(autoMixLibrary.length < 2){
+    autoMixEnabled = false;
+    syncAutoMixButton();
+    setAutoMixNote(`Need at least 2 longer tracks in Library for Auto Mix.`);
+    return;
+  }
+  autoMixEnabled = true;
+  syncAutoMixButton();
+  setAutoMixNote(`Auto Mix ON • ${autoMixLibrary.length} full tracks available.`);
+  autoMixCurrentDeck = "A";
+  const first = pickAutoMixTrack([]);
+  const second = pickAutoMixTrack(first ? [first.url] : []);
+  if(!first || !second){ stopAutoMix(); return; }
+  await loadDeckForAutoMix("A", first, true);
+  await loadDeckForAutoMix("B", second, false);
+  setCross(0);
+}
+
 
 
 async function pickSampleFromLibrary(slot){
@@ -517,6 +624,8 @@ async function loadDeckFromUrl(deck,url,name,nameId,waveId){
   deck.sourceUrl=url;
   deck.sourceName=name||url.split("/").pop()||"—";
   deck.sourceType="url";
+  if(deck.name==="A") deck.audio.loop = Boolean($("loopA")?.checked);
+  if(deck.name==="B") deck.audio.loop = Boolean($("loopB")?.checked);
   $(nameId).textContent=deck.sourceName;
   drawWave($(waveId),deck.waveform,waveId==="waveA"?"#ff5f6d":"#36d8ff");
 }
@@ -744,6 +853,8 @@ function wireDeckControls(){
   const toggle=(deck,btn)=>{ if(!deck.audio.src) return; if(deck.audio.paused){ deck.audio.play(); btn.classList.add("engaged"); } else { deck.audio.pause(); btn.classList.remove("engaged"); } };
   $("playA").addEventListener("click",()=>toggle(deckA,$("playA")));
   $("playB").addEventListener("click",()=>toggle(deckB,$("playB")));
+  $("loopA").addEventListener("change",(e)=>{ deckA.audio.loop=!!e.target?.checked; });
+  $("loopB").addEventListener("change",(e)=>{ deckB.audio.loop=!!e.target?.checked; });
   $("stopA").addEventListener("click",()=>{ if(!deckA.audio.src) return; deckA.audio.pause(); deckA.audio.currentTime=0; $("playA").classList.remove("engaged"); });
   $("stopB").addEventListener("click",()=>{ if(!deckB.audio.src) return; deckB.audio.pause(); deckB.audio.currentTime=0; $("playB").classList.remove("engaged"); });
 
@@ -826,6 +937,12 @@ function wire(){
   loadManifest().then(()=>{ initSamplesFromManifest(); renderLibrary(); });
   $("scanAudio")?.addEventListener("click",()=>renderLibrary());
   $("clearQueue")?.addEventListener("click",()=>{ const w=$("libList"); if(w) w.innerHTML=""; });
+  $("autoMixBtn")?.addEventListener("click", async ()=>{
+    if(autoMixEnabled){ stopAutoMix(); return; }
+    setAutoMixNote(`Scanning for tracks longer than ${AUTO_MIX_MIN_SECONDS} seconds...`);
+    await startAutoMix();
+  });
+  syncAutoMixButton();
   $("saveScene")?.addEventListener("click", ()=>{
     const scene=captureScene();
     const clean=safeName(scene.sceneName,"show-1").replace(/[^a-z0-9_-]+/gi,"-").replace(/^-+|-+$/g,"") || "show-1";
@@ -875,8 +992,31 @@ function loop(now){
   $("platterB").style.transform=`rotate(${deckB.platterAngle}rad)`;
   $("timeA").textContent=`${fmtTime(deckA.audio.currentTime)} / ${fmtTime(deckA.duration||deckA.audio.duration||0)}`;
   $("timeB").textContent=`${fmtTime(deckB.audio.currentTime)} / ${fmtTime(deckB.duration||deckB.audio.duration||0)}`;
+  $("playA").classList.toggle("engaged", !deckA.audio.paused);
+  $("playB").classList.toggle("engaged", !deckB.audio.paused);
   drawDeckWave($("waveA"), deckA, "#ff5f6d");
   drawDeckWave($("waveB"), deckB, "#36d8ff");
+
+  if(autoMixEnabled && !autoMixBusy){
+    const current=deckByLetter(autoMixCurrentDeck);
+    const otherLetter=oppositeDeckLetter(autoMixCurrentDeck);
+    const other=deckByLetter(otherLetter);
+    const dur=current.duration||current.audio.duration||0;
+    const remaining=dur-(current.audio.currentTime||0);
+
+    if(!current.audio.paused && isFinite(remaining) && remaining>0 && remaining<=10 && other.audio.src && other.audio.paused){
+      other.audio.play().then(()=>{
+        triggerTransition();
+        const finishedDeckLetter = autoMixCurrentDeck;
+        autoMixCurrentDeck = otherLetter;
+        queueAutoMixIntoDeck(finishedDeckLetter, false);
+      }).catch(()=>{});
+    }
+
+    if(deckA.audio.paused && deckB.audio.paused){
+      queueAutoMixIntoDeck(autoMixCurrentDeck, true);
+    }
+  }
 
   if(unlocked){
     paintMeter(meterA, Math.min(1, estimateRms(deckA.analyser)*3.4));
