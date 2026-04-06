@@ -1000,12 +1000,12 @@ async function getTrackDurationSec(url){
   });
 }
 
-async function buildAutoMixLibrary(){
+async function buildAutoMixLibrary(minSeconds = AUTO_MIX_MIN_SECONDS){
   const items = await scanAudio();
   const enriched = [];
   for(const it of items){
     const durationSec = await getTrackDurationSec(it.url);
-    if(durationSec >= AUTO_MIX_MIN_SECONDS){
+    if(durationSec >= minSeconds){
       enriched.push({...it, durationSec});
     }
   }
@@ -1025,7 +1025,10 @@ async function loadDeckForAutoMix(deckLetter, track, shouldPlay){
   updateMeta();
   redraw();
   if(shouldPlay){
-    await deck.audio.play();
+    await deck.audio.play().catch(()=>{
+      setAutoMixNote("Auto Mix: browser blocked autoplay. Press Play once, then Start Auto Mix again.");
+      stopAutoMix();
+    });
     return;
   }
   deck.audio.pause();
@@ -1055,9 +1058,12 @@ function stopAutoMix(){
 
 async function startAutoMix(){
   if(!unlocked) await enableAudio();
-  autoMixLibrary = await buildAutoMixLibrary();
+  autoMixLibrary = await buildAutoMixLibrary(AUTO_MIX_MIN_SECONDS);
   if(autoMixLibrary.length < 2){
-    setAutoMixNote(`Need at least 2 full tracks (>${AUTO_MIX_MIN_SECONDS}s) in Library for Auto Mix.`);
+    autoMixLibrary = await buildAutoMixLibrary(45);
+  }
+  if(autoMixLibrary.length < 2){
+    setAutoMixNote(`Need at least 2 longer tracks in Library for Auto Mix.`);
     autoMixEnabled = false;
     syncAutoMixButton();
     return;

@@ -37,6 +37,9 @@ body.level2-unlocked .level2-gate{display:none}
 .btn.led.engaged{box-shadow:0 0 20px rgba(88,255,175,.75), inset 0 0 14px rgba(255,255,255,.3)}
 .btn.stop{background:radial-gradient(circle at 50% 35%,#ff9fa8,#7d1e2a 72%);color:#2b0b10}
 .btn.rec{background:radial-gradient(circle at 50% 35%,#ff8c9a,#5f1323 70%);color:#2a0910}
+.btn.play-btn{background:linear-gradient(180deg,#71f28d,#1f9d46);color:#07200f;border-color:rgba(140,255,170,.55)}
+.btn.stop-btn{background:linear-gradient(180deg,#ff8e97,#c72a3a);color:#2e0910;border-color:rgba(255,150,160,.65)}
+.btn.cue-btn{background:linear-gradient(180deg,#79c3ff,#2f69df);color:#04142d;border-color:rgba(145,190,255,.65)}
 
 .wavepanel,.record-panel{padding:10px;display:grid;gap:8px;margin-bottom:12px}
 .wave-canvas{width:100%;height:90px;border-radius:10px;background:#0a0f1d;border:1px solid var(--stroke)}

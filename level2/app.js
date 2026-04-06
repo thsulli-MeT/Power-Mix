@@ -210,6 +210,8 @@ class Deck{
     this.sourceUrl = null;
     this.sourceName = file.name;
     this.sourceType = "local";
+    if(this.name==="A") this.audio.loop = Boolean($("loopA")?.checked);
+    if(this.name==="B") this.audio.loop = Boolean($("loopB")?.checked);
   }
 
   tick(dt){
@@ -499,12 +501,12 @@ async function getTrackDurationSec(url){
   });
 }
 
-async function buildAutoMixLibrary(){
+async function buildAutoMixLibrary(minSeconds = AUTO_MIX_MIN_SECONDS){
   const items=await scanAudio();
   const full=[];
   for(const it of items){
     const durationSec=await getTrackDurationSec(it.url);
-    if(durationSec >= AUTO_MIX_MIN_SECONDS) full.push({...it, durationSec});
+    if(durationSec >= minSeconds) full.push({...it, durationSec});
   }
   return full;
 }
@@ -521,7 +523,10 @@ async function loadDeckForAutoMix(deckLetter, track, shouldPlay){
   const playBtn = deckLetter==="A" ? $("playA") : $("playB");
   await loadDeckFromUrl(deck, track.url, track.name, deckLetter==="A"?"trackAName":"trackBName", deckLetter==="A"?"waveA":"waveB");
   if(shouldPlay){
-    await deck.audio.play();
+    await deck.audio.play().catch(()=>{
+      setAutoMixNote("Auto Mix: browser blocked autoplay. Press Play once, then Start Auto Mix again.");
+      stopAutoMix();
+    });
     playBtn?.classList.add("engaged");
     return;
   }
@@ -553,11 +558,14 @@ function stopAutoMix(){
 
 async function startAutoMix(){
   if(!unlocked) await enableAudio();
-  autoMixLibrary = await buildAutoMixLibrary();
+  autoMixLibrary = await buildAutoMixLibrary(AUTO_MIX_MIN_SECONDS);
+  if(autoMixLibrary.length < 2){
+    autoMixLibrary = await buildAutoMixLibrary(45);
+  }
   if(autoMixLibrary.length < 2){
     autoMixEnabled = false;
     syncAutoMixButton();
-    setAutoMixNote(`Need at least 2 tracks longer than ${AUTO_MIX_MIN_SECONDS} seconds.`);
+    setAutoMixNote(`Need at least 2 longer tracks in Library for Auto Mix.`);
     return;
   }
   autoMixEnabled = true;
@@ -616,6 +624,8 @@ async function loadDeckFromUrl(deck,url,name,nameId,waveId){
   deck.sourceUrl=url;
   deck.sourceName=name||url.split("/").pop()||"—";
   deck.sourceType="url";
+  if(deck.name==="A") deck.audio.loop = Boolean($("loopA")?.checked);
+  if(deck.name==="B") deck.audio.loop = Boolean($("loopB")?.checked);
   $(nameId).textContent=deck.sourceName;
   drawWave($(waveId),deck.waveform,waveId==="waveA"?"#ff5f6d":"#36d8ff");
 }
