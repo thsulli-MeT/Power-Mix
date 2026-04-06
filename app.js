@@ -1019,22 +1019,27 @@ function chooseNextAutoMixTrack(excludeUrls = []){
   return pool[Math.floor(Math.random() * pool.length)] || null;
 }
 
-async function loadAndPlayDeck(deckLetter, track){
+async function loadDeckForAutoMix(deckLetter, track, shouldPlay){
   const deck = getDeckByLetter(deckLetter);
   await deck.loadFromUrl(encodeURI(track.url));
   updateMeta();
   redraw();
-  await deck.audio.play();
+  if(shouldPlay){
+    await deck.audio.play();
+    return;
+  }
+  deck.audio.pause();
+  deck.audio.currentTime = 0;
 }
 
-async function queueAutoMixIntoDeck(deckLetter){
+async function queueAutoMixIntoDeck(deckLetter, shouldPlay = false){
   if(autoMixBusy) return;
   autoMixBusy = true;
   try{
     const exclude = [deckA.audio.src, deckB.audio.src].filter(Boolean);
     const nextTrack = chooseNextAutoMixTrack(exclude);
     if(!nextTrack) return;
-    await loadAndPlayDeck(deckLetter, nextTrack);
+    await loadDeckForAutoMix(deckLetter, nextTrack, shouldPlay);
   }catch(err){
     console.warn("Auto mix queue failed", err);
   }finally{
@@ -1061,12 +1066,15 @@ async function startAutoMix(){
   syncAutoMixButton();
   setAutoMixNote(`Auto Mix ON • ${autoMixLibrary.length} full tracks available.`);
 
-  if(deckA.audio.paused && deckB.audio.paused){
-    autoMixCurrentDeck = "A";
-    await queueAutoMixIntoDeck("A");
-  }else{
-    autoMixCurrentDeck = !deckA.audio.paused ? "A" : "B";
+  autoMixCurrentDeck = "A";
+  const first = chooseNextAutoMixTrack([]);
+  const second = chooseNextAutoMixTrack(first ? [first.url] : []);
+  if(!first || !second){
+    stopAutoMix();
+    return;
   }
+  await loadDeckForAutoMix("A", first, true);
+  await loadDeckForAutoMix("B", second, false);
 }
 
 function updateMeta(){
@@ -1096,17 +1104,18 @@ function loop(now){
     const dur = currentDeck.duration || currentDeck.audio.duration || 0;
     const remaining = dur - (currentDeck.audio.currentTime || 0);
 
-    if(!currentDeck.audio.paused && isFinite(remaining) && remaining > 0 && remaining <= 10 && otherDeck.audio.paused){
-      queueAutoMixIntoDeck(otherLetter).then(()=>{
-        if(otherDeck.audio.paused) return;
+    if(!currentDeck.audio.paused && isFinite(remaining) && remaining > 0 && remaining <= 10 && otherDeck.audio.src && otherDeck.audio.paused){
+      otherDeck.audio.play().then(()=>{
         nextTransitionDir = autoMixCurrentDeck === "A" ? "AtoB" : "BtoA";
         runTransition();
+        const finishedDeckLetter = autoMixCurrentDeck;
         autoMixCurrentDeck = otherLetter;
-      });
+        queueAutoMixIntoDeck(finishedDeckLetter, false);
+      }).catch(()=>{});
     }
 
     if(deckA.audio.paused && deckB.audio.paused){
-      queueAutoMixIntoDeck(autoMixCurrentDeck);
+      queueAutoMixIntoDeck(autoMixCurrentDeck, true);
     }
   }
 
