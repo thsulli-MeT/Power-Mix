@@ -117,12 +117,12 @@ body{
 }
 .btn.play-btn{
   border: none;
-  background: linear-gradient(90deg, #58e06d, #2fbf53);
+  background: linear-gradient(90deg, #76f58f, #27b84c);
   color: #07200f;
 }
 .btn.cue-btn{
   border: none;
-  background: linear-gradient(90deg, #62b9ff, #3e7dff);
+  background: linear-gradient(90deg, #7ec7ff, #2f6ef0);
   color: #06152c;
 }
 .btn.ghost{
