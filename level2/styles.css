@@ -37,6 +37,9 @@ body.level2-unlocked .level2-gate{display:none}
 .btn.led.engaged{box-shadow:0 0 20px rgba(88,255,175,.75), inset 0 0 14px rgba(255,255,255,.3)}
 .btn.stop{background:radial-gradient(circle at 50% 35%,#ff9fa8,#7d1e2a 72%);color:#2b0b10}
 .btn.rec{background:radial-gradient(circle at 50% 35%,#ff8c9a,#5f1323 70%);color:#2a0910}
+.btn.play-btn{background:linear-gradient(180deg,#71f28d,#1f9d46);color:#07200f;border-color:rgba(140,255,170,.55)}
+.btn.stop-btn{background:linear-gradient(180deg,#ff8e97,#c72a3a);color:#2e0910;border-color:rgba(255,150,160,.65)}
+.btn.cue-btn{background:linear-gradient(180deg,#79c3ff,#2f69df);color:#04142d;border-color:rgba(145,190,255,.65)}
 
 .wavepanel,.record-panel{padding:10px;display:grid;gap:8px;margin-bottom:12px}
 .wave-canvas{width:100%;height:90px;border-radius:10px;background:#0a0f1d;border:1px solid var(--stroke)}
@@ -48,6 +51,8 @@ body.level2-unlocked .level2-gate{display:none}
 .deck{padding:12px;display:grid;gap:10px;align-content:start}
 .deck-head{display:flex;justify-content:space-between;font-weight:700}
 .deck-controls{display:flex;gap:8px;flex-wrap:wrap}
+.loop-toggle{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:0 6px}
+.btn.auto-active{outline:2px solid rgba(132,255,201,.85);box-shadow:0 0 14px rgba(132,255,201,.45)}
 .fx-title{font-weight:700;opacity:.86;font-size:13px}
 .fx-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .fxbtn{--fx-amt:0;border:1px solid rgba(255,255,255,.35);background:linear-gradient(180deg,#63666f,#3f424a 55%, #2c2f35);color:#f1f3f8;min-height:72px;padding:10px 8px;border-radius:12px;font-size:11px;font-weight:800;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 3px 8px rgba(0,0,0,.35);touch-action:none;user-select:none;transition:background .08s linear, box-shadow .08s linear, border-color .08s linear}
@@ -157,6 +162,9 @@ box-shadow:inset 0 0 0 2px rgba(255,255,255,.15),0 20px 45px rgba(0,0,0,.5);posi
 .deck-b .btn.led{background:radial-gradient(circle at 50% 35%,#9ec4ff,#254c9b 72%);color:#07172f}
 .deck-b .hot-btn{background:linear-gradient(90deg,#4fb8ff,#7689ff)}
 .deck-b .sample-pad{background:linear-gradient(90deg,#55bfff,#7e87ff)}
+.deck-a .btn.play-btn,.deck-b .btn.play-btn{background:linear-gradient(180deg,#71f28d,#1f9d46);color:#07200f;border-color:rgba(140,255,170,.55)}
+.deck-a .btn.stop-btn,.deck-b .btn.stop-btn{background:linear-gradient(180deg,#ff8e97,#c72a3a);color:#2e0910;border-color:rgba(255,150,160,.65)}
+.deck-a .btn.cue-btn,.deck-b .btn.cue-btn{background:linear-gradient(180deg,#79c3ff,#2f69df);color:#04142d;border-color:rgba(145,190,255,.65)}
 .btn.engaged{outline:2px solid rgba(255,255,255,.92);box-shadow:0 0 16px rgba(255,255,255,.65), inset 0 0 10px rgba(255,255,255,.2)}
 .hot-btn.is-set{outline:2px solid rgba(255,255,255,.92);box-shadow:0 0 12px rgba(255,255,255,.55)}
 .sample-pad.latched{outline:3px solid rgba(255,255,255,.92);box-shadow:0 0 18px rgba(255,255,255,.6), inset 0 1px 0 rgba(255,255,255,.35)}
