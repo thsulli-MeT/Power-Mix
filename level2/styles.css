@@ -19,6 +19,7 @@ body.level2-unlocked .level2-gate{display:none}
 .smv-banner-logo{max-height:82px;max-width:100%}
 .logo-wrap{text-align:center;position:relative}
 .logo-img{width:min(520px,45vw)}
+.level2-banner{width:min(640px,52vw);max-height:90px;object-fit:contain}
 .l2-badge{position:absolute;right:10px;bottom:4px;background:#111;padding:4px 10px;border-radius:999px;border:1px solid #4bc2ff;font-weight:700}
 
 .top-controls{display:flex;gap:12px;align-items:center;padding:12px;margin-bottom:12px;flex-wrap:wrap}
